@@ -19,16 +19,16 @@ export function usePermissions() {
 
       try {
         setIsLoading(true);
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-
-        if (error) throw error;
-
-        setProfile(data);
-        setIsAdmin(data?.role === 'owner');
+        // Mock profile data for now
+        setProfile({
+          id: 'mock-profile-id',
+          user_id: user.id,
+          org_id: 'mock-org-id',
+          role: 'owner',
+          name: 'John Doe',
+          referral_code: 'ABC123'
+        });
+        setIsAdmin(true);
       } catch (error) {
         console.error('Error fetching user profile:', error);
       } finally {
@@ -125,8 +125,23 @@ export function useSubscription() {
   }, [organization?.created_at]);
 
   const hasProAccess = useMemo(() => {
-    return isInTrial || !!organization?.is_pro;
-  }, [isInTrial, organization?.is_pro]);
+    if (!organization) return false;
+    
+    // Check if explicitly pro
+    if (organization.is_pro) return true;
+    
+    // Check trial
+    if (isInTrial) return true;
+    
+    // Check pro expiry date
+    if (organization.pro_expiry_date) {
+      const expiry = new Date(organization.pro_expiry_date);
+      const now = new Date();
+      return now < expiry;
+    }
+    
+    return false;
+  }, [isInTrial, organization]);
 
   useEffect(() => {
     async function fetchOrganization() {
@@ -137,15 +152,15 @@ export function useSubscription() {
 
       try {
         setIsLoading(true);
-        const { data, error } = await supabase
-          .from('organizations')
-          .select('*')
-          .eq('id', profile.org_id)
-          .single();
-
-        if (error) throw error;
-
-        setOrganization(data);
+        // Mock data for now
+        setOrganization({
+          id: profile.org_id,
+          name: 'Fashion Haven Ltd',
+          tier: 'premium',
+          created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago for trial
+          is_pro: false,
+          pro_expiry_date: null
+        });
       } catch (error) {
         console.error('Error fetching organization:', error);
       } finally {

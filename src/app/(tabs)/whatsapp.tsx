@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TextInput, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { ChatMessage } from '../../types';
@@ -20,7 +20,7 @@ const BRANCHES = [
   { id: 'vi', name: 'Victoria Island' },
 ];
 
-const MOCK_MESSAGES: ChatMessage[] = [
+const initialMockMessages: ChatMessage[] = [
   {
     id: uuid(),
     sender_role: 'staff',
@@ -38,30 +38,6 @@ const MOCK_MESSAGES: ChatMessage[] = [
     timestamp: new Date(Date.now() - 1740000).toISOString(),
     sender_name: 'shopX AI Manager',
   },
-  {
-    id: uuid(),
-    sender_role: 'staff',
-    message_type: 'text',
-    text: 'Closing shift. Drawer has 50k cash.',
-    timestamp: new Date(Date.now() - 3600000).toISOString(),
-    sender_name: 'Chidi (Ikeja)',
-  },
-  {
-    id: uuid(),
-    sender_role: 'ai_manager',
-    message_type: 'text',
-    text: '✅ Handover matched with daily sales. Shift closed. Owner notified. Goodnight!',
-    timestamp: new Date(Date.now() - 3540000).toISOString(),
-    sender_name: 'shopX AI Manager',
-  },
-  {
-    id: uuid(),
-    sender_role: 'owner',
-    message_type: 'text',
-    text: 'Great job Chidi! See you tomorrow.',
-    timestamp: new Date(Date.now() - 3480000).toISOString(),
-    sender_name: 'You (Owner)',
-  },
 ];
 
 const formatTime = (timestamp: string) => {
@@ -75,9 +51,47 @@ const formatTime = (timestamp: string) => {
 
 export default function WhatsAppScreen() {
   const [activeBranch, setActiveBranch] = useState('all');
-  const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMockMessages);
   const [inputText, setInputText] = useState('');
   const { hasProAccess, isInTrial } = useSubscription();
+
+  // Proactive Business Agent alerts - simulate on mount
+  useEffect(() => {
+    const sendProactiveAlerts = () => {
+      const alerts: ChatMessage[] = [
+        {
+          id: uuid(),
+          sender_role: 'ai_manager',
+          message_type: 'text',
+          text: '⚠️ Stock Alert: "Designer Heels - Red" at Victoria Island is running low (only 3 left). I\'ve drafted a restock request for you.',
+          timestamp: new Date().toISOString(),
+          sender_name: 'shopX Business Agent',
+        },
+        {
+          id: uuid(),
+          sender_role: 'ai_manager',
+          message_type: 'text',
+          text: '📊 Performance Alert: Today\'s sales are 25% below your 7-day average. Consider running a small promotion.',
+          timestamp: new Date(Date.now() - 60000).toISOString(),
+          sender_name: 'shopX Business Agent',
+        },
+        {
+          id: uuid(),
+          sender_role: 'ai_manager',
+          message_type: 'text',
+          text: '💸 Credit Alert: A large credit (₦50,000) was just logged for "Mr. Emeka". Keep an eye on this payment.',
+          timestamp: new Date(Date.now() - 120000).toISOString(),
+          sender_name: 'shopX Business Agent',
+        }
+      ];
+      setMessages(prev => [...prev, ...alerts]);
+    };
+
+    // Only send proactive alerts if Pro or in trial
+    if (hasProAccess) {
+      sendProactiveAlerts();
+    }
+  }, [hasProAccess]);
 
   const handleSendMessage = () => {
     if (!inputText.trim()) return;
@@ -102,7 +116,7 @@ export default function WhatsAppScreen() {
       message_type: 'text',
       text: '📢 BROADCAST: Price update effective immediately. Ankara fabric prices increased by 5%. Please update all tags.',
       timestamp: new Date().toISOString(),
-      sender_name: 'shopX AI Manager',
+      sender_name: 'shopX Business Agent',
     };
 
     setMessages([...messages, broadcastMessage]);
@@ -113,31 +127,31 @@ export default function WhatsAppScreen() {
     const isAI = item.sender_role === 'ai_manager';
 
     return (
-      <View
-        className={`flex-row px-4 py-2 ${isOwner ? 'justify-end' : 'justify-start'}`}
-      >
+      <View className="flex-row px-4 py-2">
         <View
-          className={`max-w-[80%] rounded-2xl p-4 ${
-            isOwner
-              ? 'bg-emerald-600'
-              : isAI
-              ? 'bg-zinc-800 border border-zinc-700'
-              : 'bg-zinc-900'
-          }`}
+          className={`max-w-[80%] rounded-2xl p-4 ${isOwner ? 'bg-emerald-600' : isAI ? 'bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/40' : 'bg-zinc-900'}`}
         >
-          <Text
-            className={`text-xs font-semibold mb-1 ${
-              isOwner ? 'text-emerald-100' : isAI ? 'text-cyan-400' : 'text-zinc-400'
-            }`}
-          >
-            {item.sender_name}
-          </Text>
+          {/* AI Avatar/Header */}
+          {isAI && (
+            <View className="flex-row items-center gap-2 mb-2">
+              <View className="h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-emerald-500">
+                <Feather name="zap" size={14} color="#FFFFFF" />
+              </View>
+              <Text className="text-xs font-bold text-cyan-400">
+                shopX Business Agent
+              </Text>
+            </View>
+          )}
+
+          {!isAI && !isOwner && (
+            <Text className="text-xs font-semibold mb-1 text-zinc-400">
+              {item.sender_name}
+            </Text>
+          )}
 
           {item.message_type === 'audio' && (
             <View className="flex-row items-center mb-2 gap-3 bg-zinc-800/50 rounded-xl p-3">
-              <TouchableOpacity
-                className="h-10 w-10 items-center justify-center rounded-full bg-zinc-700"
-              >
+              <TouchableOpacity className="h-10 w-10 items-center justify-center rounded-full bg-zinc-700">
                 <Feather name="play" size={18} color="#A1A1AA" />
               </TouchableOpacity>
               <View className="flex-1 h-1 bg-zinc-600 rounded-full overflow-hidden">
@@ -146,16 +160,12 @@ export default function WhatsAppScreen() {
             </View>
           )}
 
-          <Text
-            className={`text-base leading-6 ${
-              isOwner ? 'text-white' : 'text-zinc-100'
-            }`}
-          >
+          <Text className={`text-base leading-6 ${isOwner ? 'text-white' : 'text-zinc-50'}`}>
             {item.text}
           </Text>
 
           {item.transcription && (
-            <View className="mt-3 p-3 bg-zinc-900/50 rounded-xl border border-zinc-700">
+            <View className="mt-3 p-3 bg-zinc-800/50 rounded-xl border border-zinc-700">
               <Text className="text-xs font-semibold text-zinc-500 mb-1">
                 🎤 AI Transcription
               </Text>
@@ -170,16 +180,12 @@ export default function WhatsAppScreen() {
           )}
           
           {isAI && hasProAccess && (
-            <Text className="text-xs mt-2 text-right text-yellow-400">
+            <Text className="text-xs mt-2 text-right text-cyan-400">
               Premium Analytics Enabled
             </Text>
           )}
 
-          <Text
-            className={`text-xs mt-1 text-right ${
-              isOwner ? 'text-emerald-100' : 'text-zinc-500'
-            }`}
-          >
+          <Text className={`text-xs mt-1 text-right ${isOwner ? 'text-emerald-100' : 'text-zinc-500'}`}>
             {formatTime(item.timestamp)}
           </Text>
         </View>
@@ -194,7 +200,7 @@ export default function WhatsAppScreen() {
         <View className="flex-row items-center mb-4 gap-2">
           <View className="h-3 w-3 rounded-full bg-[#25D366] animate-pulse" />
           <Text className="text-sm font-semibold text-[#25D366]">
-            Meta API: Connected
+            Business Agent Active
           </Text>
         </View>
 
@@ -206,18 +212,10 @@ export default function WhatsAppScreen() {
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <TouchableOpacity
-              className={`px-4 py-2 rounded-full border ${
-                activeBranch === item.id
-                  ? 'bg-[#25D366] border-[#25D366]'
-                  : 'bg-zinc-900 border-zinc-800'
-              }`}
+              className={`px-4 py-2 rounded-full border ${activeBranch === item.id ? 'bg-[#25D366] border-[#25D366]' : 'bg-zinc-900 border-zinc-800'}`}
               onPress={() => setActiveBranch(item.id)}
             >
-              <Text
-                className={`text-sm font-medium ${
-                  activeBranch === item.id ? 'text-white' : 'text-zinc-400'
-                }`}
-              >
+              <Text className={`text-sm font-medium ${activeBranch === item.id ? 'text-white' : 'text-zinc-400'}`}>
                 {item.name}
               </Text>
             </TouchableOpacity>
@@ -256,9 +254,7 @@ export default function WhatsAppScreen() {
             />
           </View>
           <TouchableOpacity
-            className={`h-10 w-10 items-center justify-center rounded-full ${
-              inputText.trim() ? 'bg-[#25D366]' : 'bg-zinc-800'
-            }`}
+            className={`h-10 w-10 items-center justify-center rounded-full ${inputText.trim() ? 'bg-[#25D366]' : 'bg-zinc-800'}`}
             onPress={handleSendMessage}
             disabled={!inputText.trim()}
           >

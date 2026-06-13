@@ -8,6 +8,7 @@ export interface Organization {
   tier: OrganizationTier;
   created_at: string;
   is_pro: boolean;
+  pro_expiry_date: string | null;
 }
 
 export interface Profile {
@@ -16,6 +17,7 @@ export interface Profile {
   org_id: string;
   role: UserRole;
   name: string;
+  referral_code: string;
 }
 
 export interface Location {
