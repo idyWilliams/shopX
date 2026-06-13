@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, FlatList, Image, TouchableOpacity } from 'react-native';
+import React, { useState, useMemo, useEffect } from 'react';
+import { View, Text, FlatList, Image, TouchableOpacity, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { supabaseMock } from '../../services/supabaseMock';
-import type { Product, Location, Inventory } from '../../types';
+import { supabase } from '../../lib/supabase';
+import type { Product, Location, Inventory as InventoryType } from '../../types';
 
 interface InventoryItem {
   product: Product;
@@ -64,11 +64,56 @@ const calculateFX = (amount: number, fromCurrency: string, toCurrency: string, r
 
 export default function InventoryScreen() {
   const [activeLocation, setActiveLocation] = useState('all');
+  const [isLoading, setIsLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [inventory, setInventory] = useState<InventoryType[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const rates = useExchangeRates();
 
-  const products = supabaseMock.getProducts();
-  const inventory = supabaseMock.getInventory();
-  const locations = supabaseMock.getLocations();
+  // Fetch data from Supabase on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+
+        // Fetch Products
+        const { data: productsData, error: productsError } = await supabase
+          .from('products')
+          .select('*');
+        
+        if (productsError) throw productsError;
+
+        // Fetch Inventory
+        const { data: inventoryData, error: inventoryError } = await supabase
+          .from('inventory')
+          .select('*');
+        
+        if (inventoryError) throw inventoryError;
+
+        // Fetch Locations
+        const { data: locationsData, error: locationsError } = await supabase
+          .from('locations')
+          .select('*');
+        
+        if (locationsError) throw locationsError;
+
+        setProducts(productsData || []);
+        setInventory(inventoryData || []);
+        setLocations(locationsData || []);
+      } catch (error) {
+        console.error('Error fetching inventory data:', error);
+        Alert.alert(
+          'Connection Error',
+          'Failed to load inventory data. Please check your internet connection.',
+          [{ text: 'OK' }]
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const locationMap = useMemo(() => {
     const map: { [key: string]: string } = {};
@@ -213,6 +258,15 @@ export default function InventoryScreen() {
 
   const totalAssetValueUSD = calculateFX(totalAssetValue, 'NGN', 'USD', rates);
   const totalAssetValueGBP = calculateFX(totalAssetValue, 'NGN', 'GBP', rates);
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-zinc-950 items-center justify-center">
+        <Feather name="loader" size={48} color="#A1A1AA" />
+        <Text className="text-zinc-400 mt-4 text-base">Loading Inventory...</Text>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-zinc-950">
