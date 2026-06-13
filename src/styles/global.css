@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #0EA5E9;
+  --color-sale: #10B981;
+  --color-restock: #3B82F6;
+  --color-transfer: #8B5CF6;
+  --color-anomaly: #F59E0B;
+}
+
+body {
+  font-family: 'System';
+}
