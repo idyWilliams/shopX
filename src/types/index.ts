@@ -7,6 +7,7 @@ export interface Organization {
   name: string;
   tier: OrganizationTier;
   created_at: string;
+  is_pro: boolean;
 }
 
 export interface Profile {
