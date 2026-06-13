@@ -28,7 +28,7 @@ export interface Product {
   org_id: string;
   name: string;
   category: string;
-  image_url: string;
+  image_url: string | null;
   base_currency: string;
   cost_price: number;
   selling_price: number;
@@ -67,6 +67,18 @@ export interface ChatMessage {
   transcription?: string;
   timestamp: string;
   sender_name: string;
+}
+
+export interface Shift {
+  id: string;
+  location_id: string;
+  declared_cash: number;
+  declared_transfers: number;
+  expected_cash: number;
+  expected_transfers: number;
+  status: 'pending' | 'matched' | 'discrepancy';
+  created_by: string | null;
+  created_at: string;
 }
 
 export interface StaleStockAlert {

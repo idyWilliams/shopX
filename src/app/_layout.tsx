@@ -1,54 +1,102 @@
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { View } from 'react-native';
-import '../styles/global.css';
+import React, { useEffect, useState, createContext, useContext } from 'react';
+import { View, ActivityIndicator, Text } from 'react-native';
+import { Slot, useRouter, useSegments } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import { supabase } from '../lib/supabase';
+import type { Session, User } from '@supabase/supabase-js';
+
+// Auth Context for easy access across components
+type AuthContextType = {
+  session: Session | null;
+  user: User | null;
+  isLoading: boolean;
+  signOut: () => Promise<void>;
+};
+
+const AuthContext = createContext<AuthContextType | null>(null);
+
+// Hook to access auth context
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
 
 export default function RootLayout() {
-  return (
-    <>
-      <StatusBar style="light" />
-      <View className="flex-1 bg-gray-900">
-        <Stack
-          screenOptions={{
-            headerStyle: { backgroundColor: '#1F2937' },
-            headerTintColor: '#F9FAFB',
-            headerTitleStyle: { fontWeight: '600' },
-            contentStyle: { backgroundColor: '#111827' },
-          }}
-        >
-          <Stack.Screen
-            name="(tabs)"
-            options={{
-              headerShown: false,
-            }}
-          />
-          <Stack.Screen
-            name="index"
-            options={{
-              title: 'shopX',
-              headerBackTitle: 'Back',
-            }}
-          />
-          <Stack.Screen
-            name="capture"
-            options={{
-              presentation: 'modal',
-              title: 'Snap & Chat',
-              headerStyle: { backgroundColor: '#1F2937' },
-              headerTintColor: '#F9FAFB',
-            }}
-          />
-          <Stack.Screen
-            name="transfer"
-            options={{
-              presentation: 'modal',
-              title: 'Transfer Stock',
-              headerStyle: { backgroundColor: '#1F2937' },
-              headerTintColor: '#F9FAFB',
-            }}
-          />
-        </Stack>
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+  const segments = useSegments();
+
+  // Check initial session and listen for changes
+  useEffect(() => {
+    let mounted = true;
+
+    async function getInitialSession() {
+      const { data: { session: initialSession } } = await supabase.auth.getSession();
+      if (mounted) {
+        setSession(initialSession);
+        setIsLoading(false);
+      }
+    }
+
+    getInitialSession();
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (mounted) {
+        setSession(newSession);
+        setIsLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Handle navigation based on auth state
+  useEffect(() => {
+    if (isLoading) return;
+
+    const isAuthRoute = segments[0] === 'auth';
+    const isLoggedIn = !!session;
+
+    if (!isLoggedIn && !isAuthRoute) {
+      // Redirect to auth screen if not logged in and not on auth route
+      router.replace('/auth');
+    } else if (isLoggedIn && isAuthRoute) {
+      // Redirect to tabs if logged in and on auth route
+      router.replace('/(tabs)');
+    }
+  }, [session, isLoading, segments, router]);
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  // Show loading while checking session
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-zinc-950">
+        <ActivityIndicator size="large" color="#06B6D4" />
+        <Text className="text-zinc-400 mt-4 text-sm">Loading shopX...</Text>
       </View>
-    </>
+    );
+  }
+
+  return (
+    <AuthContext.Provider
+      value={{
+        session,
+        user: session?.user ?? null,
+        isLoading,
+        signOut,
+      }}
+    >
+      <Slot />
+    </AuthContext.Provider>
   );
 }

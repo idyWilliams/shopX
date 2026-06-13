@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,9 @@ import {
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
+import { supabase } from '../lib/supabase';
+import type { ParsedActivityInput, Product, Location } from '../types';
 import { supabaseMock } from '../services/supabaseMock';
-import type { ParsedActivityInput } from '../types';
 
 type Status = 'IDLE' | 'ANALYZING' | 'CONFIRMING';
 
@@ -24,6 +25,27 @@ export default function CaptureScreen() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [parsedResult, setParsedResult] = useState<ParsedActivityInput | null>(null);
   const [pulseAnim] = useState(new Animated.Value(0));
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+
+  // Fetch products and locations on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [productsRes, locationsRes] = await Promise.all([
+          supabase.from('products').select('*'),
+          supabase.from('locations').select('*')
+        ]);
+
+        if (productsRes.data) setProducts(productsRes.data);
+        if (locationsRes.data) setLocations(locationsRes.data);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+    fetchData();
+  }, []);
 
   const startPulseAnimation = () => {
     Animated.loop(
@@ -87,11 +109,8 @@ export default function CaptureScreen() {
     }, 2000);
   };
 
-  const handleConfirmActivity = () => {
+  const handleConfirmActivity = async () => {
     if (!parsedResult) return;
-
-    const products = supabaseMock.getProducts();
-    const locations = supabaseMock.getLocations();
 
     const product = products.find((p) =>
       p.name.toLowerCase().includes(parsedResult.item.toLowerCase())
@@ -105,29 +124,51 @@ export default function CaptureScreen() {
       return;
     }
 
-    supabaseMock.recordActivity({
-      org_id: supabaseMock.getOrganization().id,
-      type: parsedResult.action,
-      product_id: product.id,
-      quantity: parsedResult.qty,
-      source_location_id: parsedResult.action === 'sale' ? location.id : null,
-      target_location_id: parsedResult.action === 'restock' ? location.id : null,
-      total_amount: parsedResult.amount,
-      recorded_by: supabaseMock.getProfiles()[0].id,
-    });
+    try {
+      setIsSubmitting(true);
+      
+      const orgId = locations[0]?.org_id;
+      if (!orgId) {
+        Alert.alert('Error', 'Organization not found');
+        return;
+      }
 
-    // Simulate haptic feedback
-    Alert.alert('Success', 'Activity recorded!', [
-      {
-        text: 'OK',
-        onPress: () => {
-          setStatus('IDLE');
-          setInputText('');
-          setCapturedImage(null);
-          router.replace('/(tabs)');
+      // Create activity record in Supabase
+      const { error } = await supabase
+        .from('activities')
+        .insert([{
+          org_id: orgId,
+          type: parsedResult.action,
+          product_id: product.id,
+          quantity: parsedResult.qty,
+          source_location_id: parsedResult.action === 'sale' ? location.id : null,
+          target_location_id: parsedResult.action === 'restock' ? location.id : null,
+          total_amount: parsedResult.amount,
+          timestamp: new Date().toISOString(),
+        }]);
+      
+      if (error) throw error;
+
+      Alert.alert('Success', 'Activity recorded!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            setStatus('IDLE');
+            setInputText('');
+            setCapturedImage(null);
+            router.replace('/(tabs)');
+          },
         },
-      },
-    ]);
+      ]);
+    } catch (error) {
+      console.error('Error saving activity:', error);
+      Alert.alert(
+        'Error',
+        'Failed to save activity. Please check your internet connection and try again.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getActionColor = (action: string) => {
@@ -407,13 +448,25 @@ export default function CaptureScreen() {
             <TouchableOpacity
               className="flex-1 items-center justify-center rounded-2xl py-5 bg-emerald-500"
               onPress={handleConfirmActivity}
+              disabled={isSubmitting}
               activeOpacity={0.8}
             >
               <View className="flex-row items-center gap-2">
-                <Feather name="check" color="#FFFFFF" size={18} />
-                <Text className="font-bold text-white">
-                  Confirm & Post to Feed
-                </Text>
+                {isSubmitting ? (
+                  <>
+                    <Feather name="loader" size={18} color="#FFFFFF" />
+                    <Text className="font-bold text-white">
+                      Saving...
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Feather name="check" color="#FFFFFF" size={18} />
+                    <Text className="font-bold text-white">
+                      Confirm & Post to Feed
+                    </Text>
+                  </>
+                )}
               </View>
             </TouchableOpacity>
           </View>
