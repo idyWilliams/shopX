@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { supabaseMock } from '../../services/supabaseMock';
 import { useAuth } from '../_layout';
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const organization = supabaseMock.getOrganization();
   const profiles = supabaseMock.getProfiles();
   const { signOut, user } = useAuth();
@@ -81,53 +83,15 @@ export default function SettingsScreen() {
             `${supabaseMock.getLocations().length} locations`
           )}
           {renderSettingsItem(
-            'user',
+            'users',
             'Team Members',
-            `${profiles.length} members`
+            `${profiles.length} members`,
+            () => router.push('/(tabs)/settings/team')
           )}
         </View>
       </View>
 
-      {/* Team Section */}
-      <View className="mt-6">
-        <Text className="px-4 pb-2 text-xs font-semibold uppercase text-zinc-500">
-          Team
-        </Text>
-        <View className="rounded-2xl bg-zinc-900 mx-4 overflow-hidden border border-zinc-800">
-          {profiles.map((profile) => (
-            <View
-              key={profile.id}
-              className="flex-row items-center gap-4 border-b border-zinc-800 px-4 py-3"
-            >
-              <View className="h-10 w-10 items-center justify-center rounded-full bg-cyan-500">
-                <Text className="text-sm font-semibold text-white">
-                  {profile.name.charAt(0)}
-                </Text>
-              </View>
-              <View className="flex-1">
-                <Text className="text-base font-medium text-zinc-50">{profile.name}</Text>
-                <View className="flex-row items-center gap-2">
-                  <View
-                    className="rounded-full px-2 py-0.5"
-                    style={{
-                      backgroundColor:
-                        profile.role === 'owner'
-                          ? '#06B6D4'
-                          : profile.role === 'manager'
-                          ? '#10B981'
-                          : '#8B5CF6',
-                    }}
-                  >
-                    <Text className="text-xs font-medium text-white">
-                      {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
+
 
       {/* Preferences Section */}
       <View className="mt-6">
