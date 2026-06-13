@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { supabase } from '../lib/supabase';
+import { usePermissions, useSubscription } from '../hooks/security';
 
 const PricingFeature = ({ icon, text }: { icon: string; text: string }) => (
   <View className="flex-row items-center gap-3 py-2">
@@ -15,19 +17,33 @@ const PricingFeature = ({ icon, text }: { icon: string; text: string }) => (
 export default function UpgradeScreen() {
   const router = useRouter();
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const { profile } = usePermissions();
 
-  const handleUpgrade = () => {
+  const handleUpgrade = async () => {
     setIsPurchasing(true);
     
-    // Simulate purchase flow
-    setTimeout(() => {
+    // Simulate purchase flow and update is_pro
+    try {
+      if (profile?.org_id) {
+        await supabase
+          .from('organizations')
+          .update({ is_pro: true })
+          .eq('id', profile.org_id);
+      }
+      
+      setTimeout(() => {
+        setIsPurchasing(false);
+        Alert.alert(
+          '🎉 Pro Activated!',
+          'Welcome to shopX Pro! Your lead hunting engine is now active.',
+          [{ text: 'Awesome!', onPress: () => router.back() }]
+        );
+      }, 2000);
+    } catch (error) {
+      console.error('Upgrade error:', error);
       setIsPurchasing(false);
-      Alert.alert(
-        '🎉 Premium Activated!',
-        'Welcome to shopX Premium! Your lead hunting engine is now active.',
-        [{ text: 'Awesome!', onPress: () => router.back() }]
-      );
-    }, 2000);
+      Alert.alert('Upgrade Failed', 'Please try again.');
+    }
   };
 
   return (
@@ -53,10 +69,10 @@ export default function UpgradeScreen() {
         <View className="flex-row items-start justify-between mb-6">
           <View>
             <Text className="text-sm font-semibold text-cyan-400 uppercase tracking-wider mb-1">
-              Premium
+              Pro
             </Text>
             <Text className="text-5xl font-bold text-white">
-              ₦24,999
+              ₦2,500
             </Text>
             <Text className="text-sm text-zinc-400">per month</Text>
           </View>
@@ -87,7 +103,7 @@ export default function UpgradeScreen() {
           ) : (
             <>
               <Feather name="zap" size={20} color="#FFFFFF" />
-              <Text className="text-base font-bold text-white">Upgrade Now</Text>
+              <Text className="text-base font-bold text-white">Subscribe</Text>
             </>
           )}
         </TouchableOpacity>
@@ -106,15 +122,15 @@ export default function UpgradeScreen() {
         <View className="flex-row gap-3 mb-4">
           <View className="flex-1 p-4 rounded-2xl bg-zinc-900 border border-zinc-800">
             <Text className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">
-              Free
+              Basic
             </Text>
             <Text className="text-2xl font-bold text-zinc-400">₦0</Text>
           </View>
           <View className="flex-1 p-4 rounded-2xl bg-gradient-to-br from-cyan-500/15 to-emerald-500/15 border border-cyan-500/40">
             <Text className="text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-2">
-              Premium
+              Pro
             </Text>
-            <Text className="text-2xl font-bold text-white">₦24,999</Text>
+            <Text className="text-2xl font-bold text-white">₦2,500</Text>
           </View>
         </View>
 

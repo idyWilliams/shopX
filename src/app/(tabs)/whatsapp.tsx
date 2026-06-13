@@ -1,14 +1,9 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, FlatList, TextInput, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { ChatMessage } from '../../types';
 import whatsappService from '../../lib/whatsapp';
+import { useSubscription } from '../../hooks/security';
 
 const uuid = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -82,6 +77,7 @@ export default function WhatsAppScreen() {
   const [activeBranch, setActiveBranch] = useState('all');
   const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
   const [inputText, setInputText] = useState('');
+  const { hasProAccess, isInTrial } = useSubscription();
 
   const handleSendMessage = () => {
     if (!inputText.trim()) return;
@@ -167,8 +163,20 @@ export default function WhatsAppScreen() {
             </View>
           )}
 
+          {isAI && !hasProAccess && (
+            <Text className="text-xs mt-2 text-right text-zinc-500">
+              Powered by shopX Basic
+            </Text>
+          )}
+          
+          {isAI && hasProAccess && (
+            <Text className="text-xs mt-2 text-right text-yellow-400">
+              Premium Analytics Enabled
+            </Text>
+          )}
+
           <Text
-            className={`text-xs mt-2 text-right ${
+            className={`text-xs mt-1 text-right ${
               isOwner ? 'text-emerald-100' : 'text-zinc-500'
             }`}
           >

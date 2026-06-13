@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, FlatList, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { usePermissions } from '../../hooks/security';
+import { usePermissions, useSubscription } from '../../hooks/security';
 import type { LeadSignal, Product, Organization } from '../../types';
 
 // Mock lead signals for demo
@@ -50,32 +50,54 @@ const MOCK_LEADS: LeadSignal[] = [
   },
 ];
 
+const AccessGate = ({ children }: { children: React.ReactNode }) => {
+  const router = useRouter();
+  const { isLoading, hasProAccess } = useSubscription();
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-zinc-950">
+        <ActivityIndicator size="large" color="#06B6D4" />
+        <Text className="text-zinc-400 mt-4 text-sm">Checking subscription...</Text>
+      </View>
+    );
+  }
+
+  if (!hasProAccess) {
+    return (
+      <View className="flex-1 bg-zinc-950 p-4">
+        <View className="flex-1 items-center justify-center">
+          <View className="h-24 w-24 items-center justify-center rounded-3xl bg-zinc-800 border border-zinc-700 mb-6">
+            <Feather name="lock" size={48} color="#A1A1AA" />
+          </View>
+          <Text className="text-2xl font-bold text-zinc-50 mb-2 text-center">
+            Lead Hunter is Premium
+          </Text>
+          <Text className="text-sm text-zinc-400 mb-8 text-center max-w-xs">
+            Unlock AI-powered lead hunting and grow your sales by 40%!
+          </Text>
+          <TouchableOpacity
+            className="w-full max-w-xs flex-row items-center justify-center gap-2 rounded-2xl bg-cyan-500 py-4"
+            onPress={() => router.push('/upgrade')}
+          >
+            <Feather name="zap" size={20} color="#FFFFFF" />
+            <Text className="text-base font-bold text-white">Upgrade to Pro</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  return <>{children}</>;
+};
+
 export default function LeadsScreen() {
   const router = useRouter();
   const [leads, setLeads] = useState<LeadSignal[]>(MOCK_LEADS);
-  const [isPremium, setIsPremium] = useState(false); // In real app, fetch from Supabase organizations table
-  const [isLoading, setIsLoading] = useState(true);
+  const { hasProAccess, isInTrial } = useSubscription();
   const { profile } = usePermissions();
 
-  useEffect(() => {
-    async function checkSubscription() {
-      try {
-        setIsLoading(true);
-        // In real app, fetch organization tier from Supabase
-        // const { data } = await supabase.from('organizations').select('tier').single();
-        // setIsPremium(data?.tier === 'premium');
-        
-        // For demo, default to not premium
-        setIsPremium(false);
-      } catch (error) {
-        console.error('Error checking subscription:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    checkSubscription();
-  }, []);
+  const isPremium = hasProAccess;
 
   // AI lead matching logic
   const filterLeadsByInventory = (
@@ -195,68 +217,40 @@ export default function LeadsScreen() {
     </View>
   );
 
-  if (isLoading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-zinc-950">
-        <Feather name="loader" size={48} color="#A1A1AA" />
-        <Text className="text-zinc-400 mt-4 text-sm">Loading leads...</Text>
-      </View>
-    );
-  }
-
   return (
-    <View className="flex-1 bg-zinc-950">
-      <View className="border-b border-zinc-800 bg-zinc-950 px-4 py-4">
-        <View className="flex-row items-center justify-between">
-          <View>
-            <Text className="text-2xl font-bold text-zinc-50">Lead Hunter</Text>
-            <Text className="text-sm text-zinc-400 mt-1">
-              {leads.length} high-intent signals nearby
-            </Text>
-          </View>
-          {isPremium && (
-            <View className="flex-row items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30">
-              <Feather name="star" size={14} color="#EAB308" />
-              <Text className="text-xs font-semibold text-yellow-400">Premium</Text>
+    <AccessGate>
+      <View className="flex-1 bg-zinc-950">
+        <View className="border-b border-zinc-800 bg-zinc-950 px-4 py-4">
+          <View className="flex-row items-center justify-between">
+            <View>
+              <Text className="text-2xl font-bold text-zinc-50">Lead Hunter</Text>
+              <Text className="text-sm text-zinc-400 mt-1">
+                {leads.length} high-intent signals nearby
+              </Text>
             </View>
-          )}
+            {isInTrial && (
+              <View className="flex-row items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30">
+                <Feather name="clock" size={14} color="#06B6D4" />
+                <Text className="text-xs font-semibold text-cyan-400">7-Day Trial</Text>
+              </View>
+            )}
+            {hasProAccess && !isInTrial && (
+              <View className="flex-row items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30">
+                <Feather name="star" size={14} color="#EAB308" />
+                <Text className="text-xs font-semibold text-yellow-400">Pro</Text>
+              </View>
+            )}
+          </View>
         </View>
+
+        <FlatList
+          data={leads}
+          renderItem={renderLeadItem}
+          keyExtractor={item => item.id}
+          contentContainerClassName="py-4"
+          showsVerticalScrollIndicator={false}
+        />
       </View>
-
-      {!isPremium && (
-        <View className="mx-4 mt-4 p-4 rounded-2xl bg-gradient-to-br from-cyan-500/10 to-emerald-500/10 border border-cyan-500/30">
-          <View className="flex-row items-start gap-3">
-            <View className="h-10 w-10 items-center justify-center rounded-full bg-cyan-500/20">
-              <Feather name="trending-up" size={20} color="#06B6D4" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-sm font-semibold text-zinc-50 mb-1">
-                Unlock Premium Lead Hunting
-              </Text>
-              <Text className="text-xs text-zinc-400 leading-5">
-                Upgrade to unlock all leads and increase your sales by an estimated 40%!
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            className="mt-4 w-full flex-row items-center justify-center gap-2 rounded-2xl bg-cyan-500 py-3"
-            onPress={() => router.push('/upgrade')}
-          >
-            <Feather name="zap" size={18} color="#FFFFFF" />
-            <Text className="text-sm font-bold text-white">
-              Upgrade to Premium
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      <FlatList
-        data={leads}
-        renderItem={renderLeadItem}
-        keyExtractor={item => item.id}
-        contentContainerClassName="py-4"
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
+    </AccessGate>
   );
 }
