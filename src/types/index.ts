@@ -18,6 +18,8 @@ export interface Profile {
   role: UserRole;
   name: string;
   referral_code: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface Location {
