@@ -2,14 +2,14 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { supabaseMock } from '../../services/supabaseMock';
 import { useAuth } from '../_layout';
+import { usePermissions, useSubscription } from '../../hooks/security';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const organization = supabaseMock.getOrganization();
-  const profiles = supabaseMock.getProfiles();
   const { signOut, user } = useAuth();
+  const { profile, isLoading: permissionsLoading } = usePermissions();
+  const { organization, isLoading: subscriptionLoading } = useSubscription();
 
   const handleSignOut = async () => {
     Alert.alert(
@@ -66,32 +66,40 @@ export default function SettingsScreen() {
         )}
       </View>
 
+      {/* Referral Banner */}
+      <TouchableOpacity
+        className="mx-4 mt-4 p-4 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-cyan-500/20 border border-yellow-500/30 flex-row items-center gap-3"
+        onPress={() => router.push('/referral')}
+      >
+        <View className="h-12 w-12 items-center justify-center rounded-3xl bg-yellow-500/20">
+          <Feather name="gift" size={24} color="#EAB308" />
+        </View>
+        <View className="flex-1">
+          <Text className="text-sm font-semibold text-zinc-50">Gift a month, get a month</Text>
+          <Text className="text-xs text-zinc-400 mt-1">Share your referral code and earn free Pro</Text>
+        </View>
+        <Feather name="chevron-right" color="#EAB308" size={20} />
+      </TouchableOpacity>
+
       {/* Organization Section */}
-      <View className="mt-4">
+      <View className="mt-6">
         <Text className="px-4 pb-2 text-xs font-semibold uppercase text-zinc-500">
           Organization
         </Text>
         <View className="rounded-2xl bg-zinc-900 mx-4 overflow-hidden border border-zinc-800">
           {renderSettingsItem(
             'building',
-            organization.name,
-            `${organization.tier.charAt(0).toUpperCase() + organization.tier.slice(1)} Plan`
-          )}
-          {renderSettingsItem(
-            'map-pin',
-            'Locations',
-            `${supabaseMock.getLocations().length} locations`
+            organization?.name || 'Loading...',
+            organization ? `${organization.tier.charAt(0).toUpperCase() + organization.tier.slice(1)} Plan` : ''
           )}
           {renderSettingsItem(
             'users',
             'Team Members',
-            `${profiles.length} members`,
+            'Manage your team',
             () => router.push('/(tabs)/settings/team')
           )}
         </View>
       </View>
-
-
 
       {/* Preferences Section */}
       <View className="mt-6">

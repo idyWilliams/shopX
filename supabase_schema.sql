@@ -9,7 +9,9 @@ CREATE TABLE IF NOT EXISTS organizations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
     tier TEXT NOT NULL CHECK (tier IN ('free', 'premium')),
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    is_pro BOOLEAN NOT NULL DEFAULT FALSE,
+    pro_expiry_date TIMESTAMP WITH TIME ZONE
 );
 
 -- 2. Profiles Table (Auth Users + Organization Links)
@@ -19,6 +21,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
     role TEXT NOT NULL CHECK (role IN ('owner', 'manager', 'assistant')),
     name TEXT NOT NULL,
+    referral_code TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 

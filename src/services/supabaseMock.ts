@@ -25,6 +25,8 @@ export const mockOrganization: Organization = {
   name: 'Lagos Fashion Hub',
   tier: 'premium',
   created_at: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+  is_pro: false,
+  pro_expiry_date: null
 };
 
 // Mock Profiles
@@ -35,6 +37,7 @@ export const mockProfiles: Profile[] = [
     org_id: mockOrganization.id,
     role: 'owner',
     name: 'Adaeze Okonkwo',
+    referral_code: 'ADA123'
   },
   {
     id: uuid(),
@@ -42,6 +45,7 @@ export const mockProfiles: Profile[] = [
     org_id: mockOrganization.id,
     role: 'manager',
     name: 'Chidi Eze',
+    referral_code: 'CHI456'
   },
   {
     id: uuid(),
@@ -49,6 +53,7 @@ export const mockProfiles: Profile[] = [
     org_id: mockOrganization.id,
     role: 'assistant',
     name: 'Funke Adeleke',
+    referral_code: 'FUN789'
   },
 ];
 
