@@ -5,6 +5,8 @@ import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
 import { useIdleTimer } from '../hooks/security';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { NoInternet } from '../components/NoInternet';
 
 // Auth Context for easy access across components
 type AuthContextType = {
@@ -90,19 +92,22 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthContext.Provider
-      value={{
-        session,
-        user: session?.user ?? null,
-        isLoading,
-        signOut,
-      }}
-    >
-      <TouchableWithoutFeedback onPress={resetIdleTimer} accessible={false}>
-        <View className="flex-1">
-          <Slot />
-        </View>
-      </TouchableWithoutFeedback>
-    </AuthContext.Provider>
+    <ErrorBoundary>
+      <AuthContext.Provider
+        value={{
+          session,
+          user: session?.user ?? null,
+          isLoading,
+          signOut,
+        }}
+      >
+        <NoInternet />
+        <TouchableWithoutFeedback onPress={resetIdleTimer} accessible={false}>
+          <View className="flex-1 pt-8">
+            <Slot />
+          </View>
+        </TouchableWithoutFeedback>
+      </AuthContext.Provider>
+    </ErrorBoundary>
   );
 }
