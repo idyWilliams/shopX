@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 const iconMap = {
   index: 'home',
   inventory: 'package',
+  leads: 'trending-up',
   alerts: 'activity',
   whatsapp: 'message-circle',
   settings: 'settings',
@@ -41,6 +42,13 @@ export default function TabLayout() {
         options={{
           title: 'Inventory',
           tabBarIcon: ({ color, size }) => <Feather name={iconMap.inventory} color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="leads"
+        options={{
+          title: 'Leads',
+          tabBarIcon: ({ color, size }) => <Feather name={iconMap.leads} color={color} size={size} />,
         }}
       />
       <Tabs.Screen
