@@ -1,9 +1,10 @@
 import React, { useEffect, useState, createContext, useContext } from 'react';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, ActivityIndicator, Text, TouchableWithoutFeedback } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
+import { useIdleTimer } from '../hooks/security';
 
 // Auth Context for easy access across components
 type AuthContextType = {
@@ -29,6 +30,7 @@ export default function RootLayout() {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const segments = useSegments();
+  const { resetIdleTimer } = useIdleTimer();
 
   // Check initial session and listen for changes
   useEffect(() => {
@@ -96,7 +98,11 @@ export default function RootLayout() {
         signOut,
       }}
     >
-      <Slot />
+      <TouchableWithoutFeedback onPress={resetIdleTimer} accessible={false}>
+        <View className="flex-1">
+          <Slot />
+        </View>
+      </TouchableWithoutFeedback>
     </AuthContext.Provider>
   );
 }
