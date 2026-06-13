@@ -108,3 +108,12 @@ export interface ParsedActivityInput {
   amount: number;
   target_location?: string;
 }
+
+export interface LeadSignal {
+  id: string;
+  product_name: string;
+  location: string;
+  timestamp: string;
+  match_confidence: number;
+  is_locked?: boolean;
+}
