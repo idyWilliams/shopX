@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, Modal, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { supabase } from '../lib/supabase';
 import { usePermissions, useSubscription } from '../hooks/security';
+import { AfricaPay, generatePaymentReference } from '../lib/payments';
 
 const PricingFeature = ({ icon, text }: { icon: string; text: string }) => (
   <View className="flex-row items-center gap-3 py-2">
@@ -18,36 +18,45 @@ export default function UpgradeScreen() {
   const router = useRouter();
   const [isPurchasing, setIsPurchasing] = useState(false);
   const { profile } = usePermissions();
+  const { isInTrial } = useSubscription();
 
   const handleUpgrade = async () => {
     setIsPurchasing(true);
     
-    // Simulate purchase flow and update is_pro
     try {
-      if (profile?.org_id) {
-        await supabase
-          .from('organizations')
-          .update({ is_pro: true })
-          .eq('id', profile.org_id);
-      }
+      const reference = generatePaymentReference();
       
-      setTimeout(() => {
-        setIsPurchasing(false);
+      // Process payment with AfricaPay
+      const result = await AfricaPay.processPayment({
+        amount: 2500,
+        currency: 'NGN',
+        email: profile?.email || 'customer@example.com',
+        phoneNumber: profile?.phone || '',
+        reference: reference,
+        description: 'shopX Pro Monthly Subscription'
+      });
+      
+      setIsPurchasing(false);
+      
+      if (result.success) {
         Alert.alert(
           '🎉 Pro Activated!',
-          'Welcome to shopX Pro! Your lead hunting engine is now active.',
-          [{ text: 'Awesome!', onPress: () => router.back() }]
+          `Welcome to shopX Pro! Transaction ID: ${result.transactionId}`,
+          [{ text: 'Let\'s Go!', onPress: () => router.back() }]
         );
-      }, 2000);
+      } else {
+        Alert.alert('Payment Failed', result.error || 'An error occurred during payment.');
+      }
     } catch (error) {
       console.error('Upgrade error:', error);
       setIsPurchasing(false);
-      Alert.alert('Upgrade Failed', 'Please try again.');
+      Alert.alert('Upgrade Failed', 'An unexpected error occurred. Please try again.');
     }
   };
 
   return (
-    <ScrollView className="flex-1 bg-zinc-950" contentContainerClassName="pb-32">
+    <>
+      <ScrollView className="flex-1 bg-zinc-950" contentContainerClassName="pb-32">
       {/* Header */}
       <View className="border-b border-zinc-800 bg-zinc-950 px-4 py-6">
         <TouchableOpacity
@@ -83,12 +92,12 @@ export default function UpgradeScreen() {
           </View>
         </View>
 
-        <PricingFeature icon="trending-up" text="AI Lead Hunter Engine - Find nearby customers" />
+        <PricingFeature icon="search" text="AI Lead Discovery - High-intent customers nearby" />
+        <PricingFeature icon="bar-chart-2" text="Advanced Analytics & Pro Sales Insights" />
+        <PricingFeature icon="users" text="Unlimited Team Management" />
         <PricingFeature icon="message-circle" text="Unlimited WhatsApp business templates" />
-        <PricingFeature icon="database" text="Advanced Analytics & Sales Insights" />
-        <PricingFeature icon="users" text="Unlimited team members" />
         <PricingFeature icon="shield" text="Priority customer support" />
-        <PricingFeature icon="settings" text="Multi-location inventory sync" />
+        <PricingFeature icon="map-pin" text="Multi-location inventory sync" />
 
         <TouchableOpacity
           className={`w-full mt-6 flex-row items-center justify-center gap-2 rounded-2xl py-4 ${isPurchasing ? 'bg-zinc-800' : 'bg-cyan-500'}`}
@@ -184,6 +193,26 @@ export default function UpgradeScreen() {
           </View>
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+
+      {/* Payment Processing Modal */}
+      <Modal
+        transparent={true}
+        visible={isPurchasing}
+        animationType="fade"
+      >
+        <View className="flex-1 items-center justify-center bg-black/75">
+          <View className="p-8 rounded-3xl bg-zinc-900 border border-zinc-800">
+            <ActivityIndicator size="large" color="#06B6D4" />
+            <Text className="text-base font-semibold text-zinc-50 mt-4">
+              Processing Payment...
+            </Text>
+            <Text className="text-xs text-zinc-400 mt-2 text-center">
+              Please wait while we complete your payment
+            </Text>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }

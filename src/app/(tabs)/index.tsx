@@ -234,8 +234,19 @@ export default function FeedScreen() {
         }
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View className="items-center justify-center py-20">
-            <Text className="text-gray-500">No activities yet</Text>
+          <View className="items-center justify-center py-20 px-8">
+            <View className="h-24 w-24 items-center justify-center rounded-3xl bg-gray-800 border border-gray-700 mb-6">
+              <Feather name="activity" size={48} color="#9CA3AF" />
+            </View>
+            <Text className="text-xl font-bold text-white mb-2 text-center">Your shop is quiet</Text>
+            <Text className="text-gray-400 text-center mb-8">Log your first sale or restock to start tracking your business activity!</Text>
+            <TouchableOpacity
+              className="flex-row items-center justify-center gap-2 rounded-2xl bg-cyan-500 py-4 px-8"
+              onPress={() => setShowInput(true)}
+            >
+              <Feather name="plus" size={20} color="#FFFFFF" />
+              <Text className="text-base font-bold text-white">Log First Activity</Text>
+            </TouchableOpacity>
           </View>
         }
       />

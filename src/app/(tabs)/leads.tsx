@@ -249,6 +249,15 @@ export default function LeadsScreen() {
           keyExtractor={item => item.id}
           contentContainerClassName="py-4"
           showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View className="items-center justify-center py-20 px-8">
+              <View className="h-24 w-24 items-center justify-center rounded-3xl bg-zinc-800 border border-zinc-700 mb-6">
+                <Feather name="search" size={48} color="#71717A" />
+              </View>
+              <Text className="text-xl font-bold text-zinc-50 mb-2 text-center">No leads found</Text>
+              <Text className="text-zinc-400 text-center mb-8">Check back soon for high-intent customers nearby!</Text>
+            </View>
+          }
         />
       </View>
     </AccessGate>

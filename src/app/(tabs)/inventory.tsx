@@ -353,11 +353,12 @@ export default function InventoryScreen() {
         contentContainerClassName="pb-8"
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View className="items-center justify-center py-20">
-            <Feather name="package" size={48} color="#374151" />
-            <Text className="mt-4 text-zinc-500 text-base">
-              No stock in this location
-            </Text>
+          <View className="items-center justify-center py-20 px-8">
+            <View className="h-24 w-24 items-center justify-center rounded-3xl bg-zinc-800 border border-zinc-700 mb-6">
+              <Feather name="package" size={48} color="#71717A" />
+            </View>
+            <Text className="text-xl font-bold text-zinc-50 mb-2 text-center">No products yet</Text>
+            <Text className="text-zinc-400 text-center mb-8">Start adding products to your inventory to track your stock!</Text>
           </View>
         }
       />
