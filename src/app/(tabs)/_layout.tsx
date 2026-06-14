@@ -1,5 +1,8 @@
 import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import React, { useState, useCallback } from 'react';
+import { AppState } from 'react-native';
+import AttendantPinLock from '../../components/AttendantPinLock';
 
 const iconMap = {
   index: 'home',
@@ -11,6 +14,28 @@ const iconMap = {
 } as const;
 
 export default function TabLayout() {
+  const [isLocked, setIsLocked] = useState<boolean>(true);
+
+  const handleUnlock = useCallback(() => {
+    setIsLocked(false);
+  }, []);
+
+  React.useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        setIsLocked(true);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  if (isLocked) {
+    return <AttendantPinLock onUnlock={handleUnlock} />;
+  }
+
   return (
     <Tabs
       screenOptions={{
