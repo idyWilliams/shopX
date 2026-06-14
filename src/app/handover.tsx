@@ -60,13 +60,23 @@ export default function HandoverScreen() {
 
         if (error) throw error;
 
-        // For now, split sales 50/50 between cash and transfers
-        // In a real app, you'd track payment method in the activity
         const salesData = data || [];
-        const totalSales = salesData.reduce((sum, act) => sum + (act.total_amount || 0), 0);
+        const cashTotal = salesData.reduce((sum, act) => {
+          if (act.payment_method === 'cash') {
+            return sum + (act.total_amount || 0);
+          }
+          return sum;
+        }, 0);
         
-        setExpectedCash(Math.round(totalSales * 0.5));
-        setExpectedTransfers(Math.round(totalSales * 0.5));
+        const transferTotal = salesData.reduce((sum, act) => {
+          if (act.payment_method === 'transfer') {
+            return sum + (act.total_amount || 0);
+          }
+          return sum;
+        }, 0);
+        
+        setExpectedCash(cashTotal);
+        setExpectedTransfers(transferTotal);
         setActivities(salesData);
       } catch (error: any) {
         console.error('Error fetching today\'s activities:', error);

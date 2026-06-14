@@ -59,6 +59,8 @@ export interface ActivityFeed {
   total_amount: number;
   recorded_by: string;
   timestamp: string;
+  image_url?: string | null;
+  payment_method?: 'cash' | 'transfer' | null;
 }
 
 export type SenderRole = 'staff' | 'ai_manager' | 'owner';
