@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 import { View, ActivityIndicator } from 'react-native';
 import '../styles/global.css';
 import { checkDeviceAuthorization } from '../lib/deviceGuard';
+import '../lib/config'; // Validate API keys on app start
 import TerminalUnauthorizedScreen from '../components/TerminalUnauthorizedScreen';
 
 function RootLayoutNav() {

@@ -2,6 +2,7 @@ import { useQuery } from '@nozbe/watermelondb/react';
 import { database } from './index';
 import { OperationalAnomaly } from './models/OperationalAnomaly';
 import { SalesEvent } from './models/SalesEvent';
+import { Lead } from './models/Lead';
 
 export const useAnomalies = () => {
   const anomaliesQuery = database
@@ -17,4 +18,13 @@ export const useSalesEvents = () => {
     .query();
   
   return useQuery(salesQuery);
+};
+
+export const useLeads = () => {
+  const leadsQuery = database
+    .get<Lead>('leads')
+    .query()
+    .observe();
+  
+  return useQuery(leadsQuery);
 };

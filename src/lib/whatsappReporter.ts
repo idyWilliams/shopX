@@ -1,4 +1,5 @@
 import * as Sharing from 'expo-sharing';
+import * as Linking from 'expo-linking';
 import type { DailyAnomalyReport } from '../services/anomalyEngine';
 
 type ReportType = 'CLOSING' | 'ANOMALY' | 'STOCK_LOW';
@@ -80,6 +81,27 @@ export const generateShopReport = async (
   }
 };
 
+export const contactLeadOnWhatsApp = async (
+  contactInfo: string,
+  productInterest: string
+): Promise<void> => {
+  const message = `Hello! I noticed you were interested in ${productInterest}. Would you like to learn more about our products?`;
+  const whatsappUrl = `https://wa.me/${contactInfo.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+  
+  try {
+    await Linking.openURL(whatsappUrl);
+  } catch (error) {
+    console.error('Error opening WhatsApp:', error);
+    await Sharing.shareAsync({
+      mimeType: 'text/plain',
+      dialogTitle: 'Contact Lead',
+      UTI: 'public.plain-text',
+      message: message,
+    });
+  }
+};
+
 export default {
   generateShopReport,
+  contactLeadOnWhatsApp,
 };
