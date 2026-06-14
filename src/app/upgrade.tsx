@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, ScrollView, Alert, Modal, ActivityIndicat
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { usePermissions, useSubscription } from '../hooks/security';
-import { AfricaPay, generatePaymentReference } from '../lib/payments';
+import { generatePaymentReference } from '../lib/payments';
+import { initiateTransaction } from '../lib/paymentRouter';
 
 const PricingFeature = ({ icon, text }: { icon: string; text: string }) => (
   <View className="flex-row items-center gap-3 py-2">
@@ -26,14 +27,12 @@ export default function UpgradeScreen() {
     try {
       const reference = generatePaymentReference();
       
-      // Process payment with AfricaPay
-      const result = await AfricaPay.processPayment({
+      // Process payment with our router
+      const result = await initiateTransaction({
         amount: 2500,
         currency: 'NGN',
-        email: profile?.email || 'customer@example.com',
-        phoneNumber: profile?.phone || '',
+        type: 'card',
         reference: reference,
-        description: 'shopX Pro Monthly Subscription'
       });
       
       setIsPurchasing(false);
@@ -41,11 +40,11 @@ export default function UpgradeScreen() {
       if (result.success) {
         Alert.alert(
           '🎉 Pro Activated!',
-          `Welcome to shopX Pro! Transaction ID: ${result.transactionId}`,
+          `Welcome to shopX Pro! Transaction ID: ${result.reference} via ${result.provider}`,
           [{ text: 'Let\'s Go!', onPress: () => router.back() }]
         );
       } else {
-        Alert.alert('Payment Failed', result.error || 'An error occurred during payment.');
+        Alert.alert('Payment Failed', 'An error occurred during payment.');
       }
     } catch (error) {
       console.error('Upgrade error:', error);
