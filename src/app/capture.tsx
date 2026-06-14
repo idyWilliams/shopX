@@ -15,6 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '../hooks/security';
 import type { ParsedActivityInput, Product, Location } from '../types';
 
 type Status = 'IDLE' | 'ANALYZING' | 'CONFIRMING';
@@ -22,6 +23,7 @@ type Status = 'IDLE' | 'ANALYZING' | 'CONFIRMING';
 export default function CaptureScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { profile, isLoading: permissionsLoading } = usePermissions();
   const [status, setStatus] = useState<Status>('IDLE');
   const [inputText, setInputText] = useState('');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
@@ -165,8 +167,7 @@ export default function CaptureScreen() {
     try {
       setIsSubmitting(true);
       
-      const orgId = locations[0]?.org_id;
-      if (!orgId) {
+      if (!profile?.org_id) {
         Alert.alert('Error', 'Organization not found');
         return;
       }
@@ -175,7 +176,7 @@ export default function CaptureScreen() {
       const { error } = await supabase
         .from('activities')
         .insert([{
-          org_id: orgId,
+          org_id: profile.org_id,
           type: parsedResult.action,
           product_id: product.id,
           quantity: parsedResult.qty,
