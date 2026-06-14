@@ -7,32 +7,69 @@ import type { Session, User } from '@supabase/supabase-js';
 import { useIdleTimer } from '../hooks/security';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { NoInternet } from '../components/NoInternet';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthContext } from '../context/AuthContext';
+import "../styles/global.css";
 
-// Auth Context for easy access across components
-type AuthContextType = {
-  session: Session | null;
-  user: User | null;
-  isLoading: boolean;
-  signOut: () => Promise<void>;
-};
+function InnerApp() {
+  const { resetIdleTimer } = useIdleTimer();
+  return (
+    <SafeAreaProvider>
+      <NoInternet />
+      <TouchableWithoutFeedback onPress={resetIdleTimer} accessible={false}>
+        <View className="flex-1 pt-8">
+          <Slot />
+        </View>
+      </TouchableWithoutFeedback>
+    </SafeAreaProvider>
+  );
+}
 
-const AuthContext = createContext<AuthContextType | null>(null);
+function AuthenticatedApp({ 
+  session, 
+  isLoading, 
+  signOut 
+}: { 
+  session: Session | null; 
+  isLoading: boolean; 
+  signOut: () => Promise<void>; 
+}) {
+  const segments = useSegments();
+  const router = useRouter();
 
-// Hook to access auth context
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  // Handle navigation based on auth state
+  useEffect(() => {
+    if (isLoading) return;
+
+    const isAuthRoute = segments[0] === 'auth';
+    const isLoggedIn = !!session;
+
+    if (!isLoggedIn && !isAuthRoute) {
+      // Redirect to auth screen if not logged in and not on auth route
+      router.replace('/auth');
+    } else if (isLoggedIn && isAuthRoute) {
+      // Redirect to tabs if logged in and on auth route
+      router.replace('/(tabs)');
+    }
+  }, [session, isLoading, segments, router]);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        session,
+        user: session?.user ?? null,
+        isLoading,
+        signOut,
+      }}
+    >
+      <InnerApp />
+    </AuthContext.Provider>
+  );
 }
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
-  const segments = useSegments();
-  const { resetIdleTimer } = useIdleTimer();
 
   // Check initial session and listen for changes
   useEffect(() => {
@@ -61,22 +98,6 @@ export default function RootLayout() {
     };
   }, []);
 
-  // Handle navigation based on auth state
-  useEffect(() => {
-    if (isLoading) return;
-
-    const isAuthRoute = segments[0] === 'auth';
-    const isLoggedIn = !!session;
-
-    if (!isLoggedIn && !isAuthRoute) {
-      // Redirect to auth screen if not logged in and not on auth route
-      router.replace('/auth');
-    } else if (isLoggedIn && isAuthRoute) {
-      // Redirect to tabs if logged in and on auth route
-      router.replace('/(tabs)');
-    }
-  }, [session, isLoading, segments, router]);
-
   const signOut = async () => {
     await supabase.auth.signOut();
   };
@@ -93,21 +114,11 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <AuthContext.Provider
-        value={{
-          session,
-          user: session?.user ?? null,
-          isLoading,
-          signOut,
-        }}
-      >
-        <NoInternet />
-        <TouchableWithoutFeedback onPress={resetIdleTimer} accessible={false}>
-          <View className="flex-1 pt-8">
-            <Slot />
-          </View>
-        </TouchableWithoutFeedback>
-      </AuthContext.Provider>
+      <AuthenticatedApp 
+        session={session} 
+        isLoading={isLoading} 
+        signOut={signOut} 
+      />
     </ErrorBoundary>
   );
 }

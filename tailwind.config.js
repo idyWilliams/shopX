@@ -1,15 +1,15 @@
-import type { Config } from 'tailwindcss';
-
-export default {
+/** @type {import('tailwindcss').Config} */
+module.exports = {
   content: [
-    './src/**/*.{js,jsx,ts,tsx}',
-    './src/app/**/*.{js,jsx,ts,tsx}',
+    "./src/app/**/*.{js,jsx,ts,tsx}",
+    "./src/components/**/*.{js,jsx,ts,tsx}",
+    "./src/context/**/*.{js,jsx,ts,tsx}",
+    "./src/hooks/**/*.{js,jsx,ts,tsx}",
   ],
-  presets: [require('nativewind/preset')],
+  presets: [require("nativewind/preset")],
   theme: {
     extend: {
       colors: {
-        // Primary brand colors
         primary: {
           50: '#F0F9FF',
           100: '#E0F2FE',
@@ -22,7 +22,6 @@ export default {
           800: '#075985',
           900: '#0C4A6E',
         },
-        // Activity feed colors
         sale: '#10B981',
         restock: '#3B82F6',
         transfer: '#8B5CF6',
@@ -31,4 +30,4 @@ export default {
     },
   },
   plugins: [],
-} satisfies Config;
+}
