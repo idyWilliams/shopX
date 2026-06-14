@@ -114,6 +114,7 @@ export interface ParsedActivityInput {
   location: string;
   amount: number;
   target_location?: string;
+  paymentMethod?: 'cash' | 'transfer' | null;
 }
 
 export interface LeadSignal {

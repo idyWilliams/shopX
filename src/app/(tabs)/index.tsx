@@ -108,6 +108,8 @@ export default function FeedScreen() {
     fetchData();
   }, []);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmitInput = async () => {
     if (!inputText.trim()) return;
 
@@ -116,33 +118,49 @@ export default function FeedScreen() {
         Alert.alert('Error', 'Organization not found');
         return;
       }
-      
-      // Simple parsing (we'll improve this later)
-      let type: ActivityType = 'sale';
-      if (inputText.toLowerCase().includes('restock')) type = 'restock';
-      if (inputText.toLowerCase().includes('transfer')) type = 'transfer';
-      if (inputText.toLowerCase().includes('anomaly')) type = 'anomaly';
 
-      const product = products[0]; // For now, pick first product
-      const location = locations[0]; // For now, pick first location
+      setIsSubmitting(true);
+
+      const { data, error } = await supabase.functions.invoke('parse-activity', {
+        body: {
+          text: inputText,
+          imageUrl: null,
+        },
+      });
+
+      if (error) throw error;
+
+      if (!data?.activity) {
+        throw new Error('Failed to parse activity');
+      }
+
+      const parsed = data.activity;
+
+      const product = products.find((p) =>
+        p.name.toLowerCase().includes(parsed.item.toLowerCase())
+      ) || products[0];
+      const location = locations.find((l) =>
+        l.name.toLowerCase().includes(parsed.location.toLowerCase())
+      ) || locations[0];
 
       if (!product || !location) {
         Alert.alert('Error', 'No product or location found');
         return;
       }
 
-      const { error } = await supabase.from('activities').insert({
+      const { error: insertError } = await supabase.from('activities').insert({
         org_id: profile.org_id,
-        type,
+        type: parsed.action,
         product_id: product.id,
-        quantity: 1,
-        source_location_id: type === 'sale' ? location.id : null,
-        target_location_id: type === 'restock' ? location.id : null,
-        total_amount: 0,
+        quantity: parsed.qty,
+        source_location_id: parsed.action === 'sale' ? location.id : null,
+        target_location_id: parsed.action === 'restock' ? location.id : null,
+        total_amount: parsed.amount,
         recorded_by: user?.id,
+        payment_method: parsed.paymentMethod || (parsed.amount > 0 ? 'cash' : null),
       });
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
       // Refresh activities
       await fetchData();
@@ -150,6 +168,8 @@ export default function FeedScreen() {
       setShowInput(false);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to record activity');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -343,11 +363,12 @@ export default function FeedScreen() {
               style={{ textAlignVertical: 'top' }}
             />
             <TouchableOpacity
-              className="mt-4 items-center rounded-xl py-4"
+              className={`mt-4 items-center rounded-xl py-4 ${isSubmitting ? 'opacity-50' : ''}`}
               style={{ backgroundColor: '#0EA5E9' }}
               onPress={handleSubmitInput}
+              disabled={isSubmitting}
             >
-              <Text className="font-semibold text-white">Submit</Text>
+              <Text className="font-semibold text-white">{isSubmitting ? 'Submitting...' : 'Submit'}</Text>
             </TouchableOpacity>
           </View>
         </View>
