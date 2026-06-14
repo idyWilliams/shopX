@@ -37,7 +37,7 @@ export default function ReferralScreen() {
   const shareToWhatsApp = async () => {
     setIsSharing(true);
     try {
-      const message = `Hey! Join shopX using my referral link and get 30 days FREE Pro! 🎉\n\nUse my code: ${referralCode}\n\nDownload shopX and start managing your business smarter!`;
+      const message = `Hey! Join shopX using my referral link and get 30 days FREE Pro!\n\nUse my code: ${referralCode}\n\nDownload shopX and start managing your business smarter!`;
       
       // In real app, use Linking to open WhatsApp
       Alert.alert(

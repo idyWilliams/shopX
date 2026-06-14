@@ -4,6 +4,9 @@
 // Note: The actual API calls should be handled by your backend/Supabase Edge Functions
 // This is a frontend placeholder that demonstrates the architectural pattern
 
+import type { OperationalAnomaly } from '../db/models/OperationalAnomaly';
+import type { DailyAnomalyReport } from '../services/anomalyEngine';
+
 interface WhatsAppOptions {
   apiToken: string;
   phoneNumberId: string;
@@ -98,3 +101,50 @@ const whatsappService = new WhatsAppService({
 });
 
 export default whatsappService;
+
+// --- NEW FUNCTIONS FOR SHAREABLE INSIGHTS ---
+
+export const generateShiftSummary = (
+  salesData: DailyAnomalyReport,
+  anomalies: OperationalAnomaly[]
+): string => {
+  const formattedSales = `₦${salesData.totalSales.toLocaleString()}`;
+  
+  const summary = [
+    'ShopX Shift Report',
+    '',
+    `Total Sales: ${formattedSales}`,
+    `Shop Health: ${salesData.shopHealth === 'balanced' ? 'Balanced' : 'Unbalanced'}`,
+    '',
+    'Key Details:',
+    `- Anomalies Today: ${anomalies.length}`,
+    `- Excessive Voids: ${salesData.excessiveVoids ? 'Yes' : 'No'}`,
+    `- Large Cash Discrepancies: ${salesData.cashDiscrepancies.length}`,
+    '',
+    'View full dashboard: shopx://dashboard',
+  ].join('\n');
+  
+  return summary;
+};
+
+export const triggerCriticalAlert = (
+  anomaly: OperationalAnomaly,
+  deviceName?: string
+): string => {
+  const alert = [
+    'SHOPX CRITICAL SECURITY ALERT',
+    '',
+    `Type: ${anomaly.anomalyType}`,
+    `Severity: ${anomaly.severity}`,
+    `Time: ${anomaly.createdAt.toLocaleString()}`,
+    '',
+    `Details: ${anomaly.payload || 'No additional details available'}`,
+    deviceName ? `Device: ${deviceName}` : '',
+    '',
+    'Please review immediately in the ShopX app!',
+    'shopx://anomalies',
+  ].filter(Boolean).join('\n');
+  
+  return alert;
+};
+
