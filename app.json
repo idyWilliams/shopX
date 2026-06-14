@@ -4,26 +4,15 @@
     "slug": "shopx",
     "version": "1.0.0",
     "scheme": "shopx",
-    "platforms": ["ios", "android"],
-    "sdkVersion": "51.0.0",
+    "platforms": ["ios", "android", "web"],
     "orientation": "portrait",
-    "icon": "./src/assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./src/assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1F2937"
-    },
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.shopx.app"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./src/assets/adaptive-icon.png",
-        "backgroundColor": "#1F2937"
-      },
       "package": "com.shopx.app"
     }
   }

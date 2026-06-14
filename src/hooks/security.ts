@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AppState, Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../app/_layout';
+import { useAuth } from '../context/AuthContext';
 import type { Profile, Organization } from '../types';
 
 export function usePermissions() {
