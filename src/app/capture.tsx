@@ -149,6 +149,42 @@ export default function CaptureScreen() {
     }, 2000);
   };
 
+  const uploadImage = async (fileUri: string, orgId: string): Promise<string | null> => {
+    try {
+      const fileName = `${orgId}/${Date.now()}.jpg`;
+      
+      // For web, fileUri is base64, for native it's file://
+      let file;
+      
+      if (typeof fetch) {
+        const response = await fetch(fileUri);
+        file = await response.blob();
+      } else {
+        return null;
+      }
+      
+      const { error: uploadError } = await supabase.storage
+        .from('activity-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+        
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data } = supabase.storage
+        .from('activity-images')
+        .getPublicUrl(fileName);
+
+      return data.publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      return null;
+    }
+  };
+
   const handleConfirmActivity = async () => {
     if (!parsedResult) return;
 
@@ -172,6 +208,12 @@ export default function CaptureScreen() {
         return;
       }
 
+      let uploadedImageUrl: string | null = null;
+      
+      if (capturedImage) {
+        uploadedImageUrl = await uploadImage(capturedImage, profile.org_id);
+      }
+
       // Create activity record in Supabase
       const { error } = await supabase
         .from('activities')
@@ -184,6 +226,8 @@ export default function CaptureScreen() {
           target_location_id: parsedResult.action === 'restock' ? location.id : null,
           total_amount: parsedResult.amount,
           timestamp: new Date().toISOString(),
+          image_url: uploadedImageUrl,
+          payment_method: parsedResult.amount > 0 ? 'cash' : null, // simple for now, can add selection later
         }]);
       
       if (error) throw error;
