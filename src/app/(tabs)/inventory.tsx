@@ -1,21 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, FlatList, Image, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, FlatList, Image, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
-import type { Product, Location, Inventory as InventoryType } from '../../types';
+import type { Product, Location as LocationType, Inventory as InventoryType } from '../../types';
 
 interface InventoryItem {
   product: Product;
   totalQuantity: number;
   quantitiesByLocation: { [key: string]: number };
 }
-
-const LOCATIONS = [
-  { id: 'all', name: 'All Locations' },
-  { id: 'lekki', name: 'Lekki Suite' },
-  { id: 'ikeja', name: 'Ikeja Branch' },
-  { id: 'vi', name: 'Victoria Island' },
-];
 
 interface ExchangeRates {
   NGN_TO_USD: number;
@@ -63,12 +56,20 @@ const calculateFX = (amount: number, fromCurrency: string, toCurrency: string, r
 };
 
 export default function InventoryScreen() {
-  const [activeLocation, setActiveLocation] = useState('all');
+  const [activeLocation, setActiveLocation] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [inventory, setInventory] = useState<InventoryType[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [locations, setLocations] = useState<LocationType[]>([]);
   const rates = useExchangeRates();
+
+  // Create location options with "All Locations"
+  const locationOptions = useMemo(() => {
+    return [
+      { id: 'all', name: 'All Locations' },
+      ...locations.map(loc => ({ id: loc.id, name: loc.name })),
+    ];
+  }, [locations]);
 
   // Fetch data from Supabase on mount
   useEffect(() => {
@@ -100,11 +101,11 @@ export default function InventoryScreen() {
         setProducts(productsData || []);
         setInventory(inventoryData || []);
         setLocations(locationsData || []);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching inventory data:', error);
         Alert.alert(
-          'Connection Error',
-          'Failed to load inventory data. Please check your internet connection.',
+          'Error',
+          error.message || 'Failed to load inventory data. Please check your internet connection.',
           [{ text: 'OK' }]
         );
       } finally {
@@ -114,21 +115,6 @@ export default function InventoryScreen() {
 
     fetchData();
   }, []);
-
-  const locationMap = useMemo(() => {
-    const map: { [key: string]: string } = {};
-    LOCATIONS.forEach((loc, idx) => {
-      if (idx === 0) return;
-      if (loc.id === 'lekki') {
-        map[loc.id] = locations[1].id;
-      } else if (loc.id === 'ikeja') {
-        map[loc.id] = locations[2].id;
-      } else if (loc.id === 'vi') {
-        map[loc.id] = locations[0].id;
-      }
-    });
-    return map;
-  }, [locations]);
 
   const inventoryByProduct = useMemo(() => {
     const map: { [key: string]: InventoryItem } = {};
@@ -177,12 +163,11 @@ export default function InventoryScreen() {
       return Object.values(inventoryByProduct);
     }
 
-    const locationId = locationMap[activeLocation];
     return Object.values(inventoryByProduct).filter((item) =>
-      item.quantitiesByLocation[locationId] &&
-      item.quantitiesByLocation[locationId] > 0
+      item.quantitiesByLocation[activeLocation] &&
+      item.quantitiesByLocation[activeLocation] > 0
     );
-  }, [inventoryByProduct, activeLocation, locationMap]);
+  }, [inventoryByProduct, activeLocation]);
 
   const getStockBadgeStyle = (qty: number) => {
     if (qty < 5) {
@@ -318,7 +303,7 @@ export default function InventoryScreen() {
       {/* Location Filter Pills */}
       <View className="mb-4">
         <FlatList
-          data={LOCATIONS}
+          data={locationOptions}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerClassName="px-4"

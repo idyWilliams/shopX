@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { useAuth } from '../../_layout';
+import { useAuth } from '../../../context/AuthContext';
 import { usePermissions } from '../../../hooks/security';
 import type { Profile } from '../../../types';
 

@@ -8,40 +8,78 @@ import {
   Alert,
   Animated,
   Easing,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import type { ParsedActivityInput, Product, Location } from '../types';
-import { supabaseMock } from '../services/supabaseMock';
 
 type Status = 'IDLE' | 'ANALYZING' | 'CONFIRMING';
 
 export default function CaptureScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [status, setStatus] = useState<Status>('IDLE');
   const [inputText, setInputText] = useState('');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [parsedResult, setParsedResult] = useState<ParsedActivityInput | null>(null);
   const [pulseAnim] = useState(new Animated.Value(0));
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+
+  // Simple parse function instead of mock
+  const parseActivityInput = (text: string): ParsedActivityInput => {
+    const lowerText = text.toLowerCase();
+    let action: ParsedActivityInput['action'] = 'sale';
+    if (lowerText.includes('restock') || lowerText.includes('received')) action = 'restock';
+    if (lowerText.includes('transfer')) action = 'transfer';
+
+    // Extract quantity
+    const qtyMatch = text.match(/(\d+)/);
+    const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+
+    // Extract amount
+    const amountMatch = text.match(/(\d+)k/i) || text.match(/total[:\s]*(\d+)/i);
+    let amount = 0;
+    if (amountMatch) {
+      const numStr = amountMatch[1];
+      amount = text.toLowerCase().includes('k') ? parseInt(numStr, 10) * 1000 : parseInt(numStr, 10);
+    }
+
+    return {
+      action,
+      item: products.length > 0 ? products[0].name : 'Item',
+      qty,
+      location: locations.length > 0 ? locations[0].name : 'Location',
+      amount,
+    };
+  };
 
   // Fetch products and locations on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setIsLoading(true);
         const [productsRes, locationsRes] = await Promise.all([
           supabase.from('products').select('*'),
           supabase.from('locations').select('*')
         ]);
 
-        if (productsRes.data) setProducts(productsRes.data);
-        if (locationsRes.data) setLocations(locationsRes.data);
-      } catch (error) {
+        if (productsRes.error) throw productsRes.error;
+        if (locationsRes.error) throw locationsRes.error;
+
+        setProducts(productsRes.data || []);
+        setLocations(locationsRes.data || []);
+      } catch (error: any) {
         console.error('Error fetching data:', error);
+        Alert.alert('Error', error.message || 'Failed to load data');
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchData();
@@ -102,7 +140,7 @@ export default function CaptureScreen() {
     startPulseAnimation();
 
     setTimeout(() => {
-      const result = supabaseMock.parseActivityInput(inputText);
+      const result = parseActivityInput(inputText);
       setParsedResult(result);
       setStatus('CONFIRMING');
       stopPulseAnimation();
@@ -207,10 +245,19 @@ export default function CaptureScreen() {
     outputRange: [0.2, 0.8],
   });
 
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-zinc-950">
+        <ActivityIndicator size="large" color="#06B6D4" />
+        <Text className="text-zinc-400 mt-4 text-sm">Loading data...</Text>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-zinc-950">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-zinc-900">
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-zinc-800">
         <TouchableOpacity onPress={() => router.back()}>
           <Feather name="x" color="#A1A1AA" size={24} />
         </TouchableOpacity>

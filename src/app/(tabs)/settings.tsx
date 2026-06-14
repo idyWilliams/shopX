@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { useAuth } from '../_layout';
+import { useAuth } from '../../context/AuthContext';
 import { usePermissions, useSubscription } from '../../hooks/security';
 
 export default function SettingsScreen() {

@@ -10,7 +10,6 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { usePermissions } from '../hooks/security';
-import { supabase } from '../lib/supabase';
 
 const generateReferralCode = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -30,6 +29,8 @@ export default function ReferralScreen() {
   useEffect(() => {
     if (profile?.referral_code) {
       setReferralCode(profile.referral_code);
+    } else {
+      setReferralCode(generateReferralCode());
     }
   }, [profile]);
 

@@ -6,19 +6,23 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { supabaseMock } from '../services/supabaseMock';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import type { Product, Location, Inventory } from '../types';
 
 export default function TransferScreen() {
   const router = useRouter();
   const { productId } = useLocalSearchParams<{ productId?: string }>();
+  const { user } = useAuth();
 
-  const [products] = useState<Product[]>(supabaseMock.getProducts());
-  const [locations] = useState<Location[]>(supabaseMock.getLocations());
-  const [inventory] = useState<Inventory[]>(supabaseMock.getInventory());
+  const [products, setProducts] = useState<Product[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [inventory, setInventory] = useState<Inventory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [sourceLocation, setSourceLocation] = useState<Location | null>(null);
@@ -26,8 +30,37 @@ export default function TransferScreen() {
   const [quantity, setQuantity] = useState(1);
   const [step, setStep] = useState(1);
 
+  // Fetch data from Supabase
   useEffect(() => {
-    if (productId) {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        const [productsRes, locationsRes, inventoryRes] = await Promise.all([
+          supabase.from('products').select('*'),
+          supabase.from('locations').select('*'),
+          supabase.from('inventory').select('*'),
+        ]);
+
+        if (productsRes.error) throw productsRes.error;
+        if (locationsRes.error) throw locationsRes.error;
+        if (inventoryRes.error) throw inventoryRes.error;
+
+        setProducts(productsRes.data || []);
+        setLocations(locationsRes.data || []);
+        setInventory(inventoryRes.data || []);
+      } catch (error: any) {
+        console.error('Error fetching transfer data:', error);
+        Alert.alert('Error', error.message || 'Failed to load data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    if (productId && products.length > 0) {
       const product = products.find((p) => p.id === productId);
       if (product) {
         setSelectedProduct(product);
@@ -43,7 +76,7 @@ export default function TransferScreen() {
     return inv?.quantity || 0;
   };
 
-  const handleTransfer = () => {
+  const handleTransfer = async () => {
     if (!selectedProduct || !sourceLocation || !targetLocation) return;
 
     if (sourceLocation.id === targetLocation.id) {
@@ -57,19 +90,57 @@ export default function TransferScreen() {
       return;
     }
 
-    const result = supabaseMock.transferStock(
-      selectedProduct.id,
-      sourceLocation.id,
-      targetLocation.id,
-      quantity
-    );
+    try {
+      // Update inventory
+      await Promise.all([
+        // Decrease source location stock
+        supabase
+          .from('inventory')
+          .update({ quantity: availableStock - quantity, updated_at: new Date().toISOString() })
+          .eq('product_id', selectedProduct.id)
+          .eq('location_id', sourceLocation.id),
 
-    if (result.success) {
+        // Increase target location stock
+        (async () => {
+          const targetStock = getLocationStock(selectedProduct.id, targetLocation.id);
+          if (targetStock > 0) {
+            await supabase
+              .from('inventory')
+              .update({ quantity: targetStock + quantity, updated_at: new Date().toISOString() })
+              .eq('product_id', selectedProduct.id)
+              .eq('location_id', targetLocation.id);
+          } else {
+            await supabase.from('inventory').insert({
+              product_id: selectedProduct.id,
+              location_id: targetLocation.id,
+              quantity: quantity,
+              updated_at: new Date().toISOString(),
+            });
+          }
+        })(),
+      ]);
+
+      // Insert transfer activity
+      const orgId = locations[0]?.org_id;
+      if (orgId) {
+        await supabase.from('activities').insert({
+          org_id: orgId,
+          type: 'transfer',
+          product_id: selectedProduct.id,
+          quantity: quantity,
+          source_location_id: sourceLocation.id,
+          target_location_id: targetLocation.id,
+          total_amount: 0,
+          recorded_by: user?.id,
+        });
+      }
+
       Alert.alert('Success', `Transferred ${quantity} units of ${selectedProduct.name}`, [
         { text: 'OK', onPress: () => router.back() },
       ]);
-    } else {
-      Alert.alert('Error', result.message);
+    } catch (error: any) {
+      console.error('Error transferring stock:', error);
+      Alert.alert('Error', error.message || 'Failed to transfer stock');
     }
   };
 
@@ -272,6 +343,15 @@ export default function TransferScreen() {
       </TouchableOpacity>
     </View>
   );
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-900">
+        <ActivityIndicator size="large" color="#06B6D4" />
+        <Text className="text-zinc-400 mt-4 text-sm">Loading transfer data...</Text>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-gray-900">
