@@ -11,6 +11,7 @@ import { SalesEvent } from './models/SalesEvent';
 import { CashDrawerLog } from './models/CashDrawerLog';
 import { DeviceRegistry } from './models/DeviceRegistry';
 import { OperationalAnomaly } from './models/OperationalAnomaly';
+import { Lead } from './models/Lead';
 
 const adapter = new SQLiteAdapter({
   schema: mySchema,
@@ -29,5 +30,6 @@ export const database = new Database({
     CashDrawerLog,
     DeviceRegistry,
     OperationalAnomaly,
+    Lead,
   ],
 });
