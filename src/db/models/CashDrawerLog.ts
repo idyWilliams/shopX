@@ -4,6 +4,9 @@ import { field, readonly, date } from '@nozbe/watermelondb/decorators';
 export class CashDrawerLog extends Model {
   static table = 'cash_drawer_logs';
 
+  @field('store_id')
+  storeId?: string;
+
   @field('shift_id')
   shiftId!: string;
 

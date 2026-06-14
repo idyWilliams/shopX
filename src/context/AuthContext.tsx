@@ -1,11 +1,22 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { database } from '../db';
+import { Store } from '../db/models/Store';
+import { Attendant } from '../db/models/Attendant';
+import { StoreAttendant } from '../db/models/StoreAttendant';
 
 type AuthContextType = {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  activeStoreId: string | null;
+  setActiveStoreId: (storeId: string | null) => void;
+  authorizedStores: Store[];
+  setAuthorizedStores: (stores: Store[]) => void;
+  currentAttendant: Attendant | null;
+  setCurrentAttendant: (attendant: Attendant | null) => void;
+  loadAuthorizedStoresForAttendant: (attendantId: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -13,6 +24,13 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   loading: true,
+  activeStoreId: null,
+  setActiveStoreId: () => {},
+  authorizedStores: [],
+  setAuthorizedStores: () => {},
+  currentAttendant: null,
+  setCurrentAttendant: () => {},
+  loadAuthorizedStoresForAttendant: async () => {},
   signOut: async () => {},
 });
 
@@ -20,6 +38,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
+  const [authorizedStores, setAuthorizedStores] = useState<Store[]>([]);
+  const [currentAttendant, setCurrentAttendant] = useState<Attendant | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -37,12 +58,44 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const loadAuthorizedStoresForAttendant = async (attendantId: string) => {
+    // Get all store_attendant relationships for this attendant
+    const storeAttendants = await database
+      .get<StoreAttendant>('store_attendants')
+      .query()
+      .fetch();
+
+    const storeIds = storeAttendants
+      .filter(sa => sa.attendantId === attendantId)
+      .map(sa => sa.storeId);
+
+    // Get all stores
+    const allStores = await database.get<Store>('stores').query().fetch();
+    const authorized = allStores.filter(s => storeIds.includes(s.id));
+    setAuthorizedStores(authorized);
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
+    setActiveStoreId(null);
+    setAuthorizedStores([]);
+    setCurrentAttendant(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signOut }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      session, 
+      loading, 
+      activeStoreId, 
+      setActiveStoreId, 
+      authorizedStores,
+      setAuthorizedStores,
+      currentAttendant,
+      setCurrentAttendant,
+      loadAuthorizedStoresForAttendant,
+      signOut 
+    }}>
       {children}
     </AuthContext.Provider>
   );

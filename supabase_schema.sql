@@ -1,123 +1,109 @@
--- shopX Multi-Tenant SaaS PostgreSQL Schema
--- Designed for Supabase
+-- ShopX PostgreSQL Schema for Supabase
+-- Flexible Multi-Store M:N Relationships
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. Organizations Table (Multi-Tenant Root)
-CREATE TABLE IF NOT EXISTS organizations (
+-- 1. Merchants Table (Owner)
+CREATE TABLE IF NOT EXISTS merchants (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email TEXT NOT NULL UNIQUE,
+    phone TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- 2. Stores Table
+CREATE TABLE IF NOT EXISTS stores (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    merchant_id UUID REFERENCES merchants(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL,
+    location_address TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- 3. Attendants Table
+CREATE TABLE IF NOT EXISTS attendants (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name TEXT NOT NULL,
-    tier TEXT NOT NULL CHECK (tier IN ('free', 'premium')),
+    hashed_pin TEXT NOT NULL,
+    access_level TEXT NOT NULL CHECK (access_level IN ('standard', 'manager', 'admin')),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- 4. Store Attendants Junction Table (M:N between Stores and Attendants)
+CREATE TABLE IF NOT EXISTS store_attendants (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    store_id UUID REFERENCES stores(id) ON DELETE CASCADE NOT NULL,
+    attendant_id UUID REFERENCES attendants(id) ON DELETE CASCADE NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    is_pro BOOLEAN NOT NULL DEFAULT FALSE,
-    pro_expiry_date TIMESTAMP WITH TIME ZONE
+    UNIQUE(store_id, attendant_id)
 );
 
--- 2. Profiles Table (Auth Users + Organization Links)
-CREATE TABLE IF NOT EXISTS profiles (
+-- 5. Device Registry Table
+CREATE TABLE IF NOT EXISTS device_registry (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
-    role TEXT NOT NULL CHECK (role IN ('owner', 'manager', 'assistant')),
-    name TEXT NOT NULL,
-    referral_code TEXT NOT NULL,
+    store_id UUID REFERENCES stores(id) ON DELETE CASCADE,
+    device_fingerprint TEXT NOT NULL UNIQUE,
+    is_trusted BOOLEAN NOT NULL DEFAULT FALSE,
+    last_login TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 3. Locations Table (Shop Branches, Storage, etc.)
-CREATE TABLE IF NOT EXISTS locations (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    org_id UUID REFERENCES organizations(id) ON DELETE CASCADE NOT NULL,
-    name TEXT NOT NULL,
-    type TEXT NOT NULL DEFAULT 'shop',
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
-
--- 4. Products Table
+-- 6. Products Table
 CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    org_id UUID REFERENCES organizations(id) ON DELETE CASCADE NOT NULL,
+    store_id UUID REFERENCES stores(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    category TEXT NOT NULL,
-    base_currency TEXT NOT NULL DEFAULT 'NGN',
-    cost_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
-    selling_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
-    image_url TEXT,
+    sku TEXT NOT NULL,
+    retail_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    wholesale_price NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    stock_quantity INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- 5. Inventory Table (Product-Location Quantities)
-CREATE TABLE IF NOT EXISTS inventory (
+-- 7. Sales Events Table
+CREATE TABLE IF NOT EXISTS sales_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    product_id UUID REFERENCES products(id) ON DELETE CASCADE NOT NULL,
-    location_id UUID REFERENCES locations(id) ON DELETE CASCADE NOT NULL,
-    quantity INTEGER NOT NULL DEFAULT 0,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    CONSTRAINT unique_product_location UNIQUE (product_id, location_id)
-);
-
--- 6. Activities Table (Timeline Feed)
-CREATE TABLE IF NOT EXISTS activities (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    org_id UUID REFERENCES organizations(id) ON DELETE CASCADE NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('sale', 'restock', 'transfer', 'anomaly')),
+    store_id UUID REFERENCES stores(id) ON DELETE CASCADE,
+    ticket_id TEXT,
     product_id UUID REFERENCES products(id) ON DELETE SET NULL,
     quantity INTEGER NOT NULL DEFAULT 0,
-    source_location_id UUID REFERENCES locations(id) ON DELETE SET NULL,
-    target_location_id UUID REFERENCES locations(id) ON DELETE SET NULL,
-    total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
-    recorded_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
-    timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
-
--- 7. Shifts Table (Handover/Reconciliation)
-CREATE TABLE IF NOT EXISTS shifts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    location_id UUID REFERENCES locations(id) ON DELETE CASCADE NOT NULL,
-    declared_cash NUMERIC(12, 2) NOT NULL DEFAULT 0,
-    declared_transfers NUMERIC(12, 2) NOT NULL DEFAULT 0,
-    expected_cash NUMERIC(12, 2) NOT NULL DEFAULT 0,
-    expected_transfers NUMERIC(12, 2) NOT NULL DEFAULT 0,
-    status TEXT NOT NULL CHECK (status IN ('pending', 'matched', 'discrepancy')),
-    created_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    price_at_sale NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    event_type TEXT NOT NULL CHECK (event_type IN ('SALE', 'VOID', 'ADJUSTMENT')),
+    attendant_id UUID REFERENCES attendants(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- Enable Row Level Security (RLS) for Multi-Tenancy
-ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE locations ENABLE ROW LEVEL SECURITY;
+-- 8. Cash Drawer Logs Table
+CREATE TABLE IF NOT EXISTS cash_drawer_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    store_id UUID REFERENCES stores(id) ON DELETE CASCADE,
+    shift_id TEXT NOT NULL,
+    event_type TEXT NOT NULL CHECK (event_type IN ('OPENING', 'CLOSING', 'DROP')),
+    expected_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    actual_amount NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    discrepancy NUMERIC(12, 2),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- 9. Operational Anomalies Table
+CREATE TABLE IF NOT EXISTS operational_anomalies (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    store_id UUID REFERENCES stores(id) ON DELETE CASCADE,
+    anomaly_type TEXT NOT NULL,
+    severity TEXT NOT NULL CHECK (severity IN ('low', 'medium', 'critical')),
+    payload TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE merchants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE attendants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE store_attendants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE device_registry ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE inventory ENABLE ROW LEVEL SECURITY;
-ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
-ALTER TABLE shifts ENABLE ROW LEVEL SECURITY;
-
--- Insert Seed Data (Optional but Recommended for Testing)
-INSERT INTO organizations (name, tier) VALUES 
-('Fashion Haven Ltd', 'premium');
-
-INSERT INTO locations (org_id, name, type) VALUES 
-((SELECT id FROM organizations WHERE name = 'Fashion Haven Ltd'), 'Victoria Island', 'shop'),
-((SELECT id FROM organizations WHERE name = 'Fashion Haven Ltd'), 'Lekki Suite', 'shop'),
-((SELECT id FROM organizations WHERE name = 'Fashion Haven Ltd'), 'Home Storage (Ikeja)', 'storage');
-
-INSERT INTO products (org_id, name, category, base_currency, cost_price, selling_price, image_url) VALUES 
-((SELECT id FROM organizations WHERE name = 'Fashion Haven Ltd'), 'Ankara Weekend Dress', 'Ankara', 'NGN', 8500, 15000, 'https://images.unsplash.com/photo-1590735213920-68192a487bc2?w=400'),
-((SELECT id FROM organizations WHERE name = 'Fashion Haven Ltd'), 'Ankara Two-Piece Set', 'Ankara', 'NGN', 12000, 22000, 'https://images.unsplash.com/photo-1583391720851-9748e2d3e2b5?w=400'),
-((SELECT id FROM organizations WHERE name = 'Fashion Haven Ltd'), 'Nigerian Lace Fabric - Gold', 'Lace', 'NGN', 25000, 45000, 'https://images.unsplash.com/photo-1558171813-4c088753af8f?w=400'),
-((SELECT id FROM organizations WHERE name = 'Fashion Haven Ltd'), 'Leather Slides - Tan', 'Shoes', 'NGN', 6000, 12000, 'https://images.unsplash.com/photo-1603487742131-4160ec999306?w=400'),
-((SELECT id FROM organizations WHERE name = 'Fashion Haven Ltd'), 'Designer Heels - Red', 'Shoes', 'NGN', 18000, 35000, 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=400'),
-((SELECT id FROM organizations WHERE name = 'Fashion Haven Ltd'), 'Leather Tote Bag - Cognac', 'Bags', 'NGN', 22000, 42000, 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400');
-
--- Seed Inventory
-INSERT INTO inventory (product_id, location_id, quantity) VALUES 
-((SELECT id FROM products WHERE name = 'Ankara Weekend Dress'), (SELECT id FROM locations WHERE name = 'Victoria Island'), 35),
-((SELECT id FROM products WHERE name = 'Ankara Weekend Dress'), (SELECT id FROM locations WHERE name = 'Lekki Suite'), 25),
-((SELECT id FROM products WHERE name = 'Ankara Weekend Dress'), (SELECT id FROM locations WHERE name = 'Home Storage (Ikeja)'), 80),
-((SELECT id FROM products WHERE name = 'Ankara Two-Piece Set'), (SELECT id FROM locations WHERE name = 'Victoria Island'), 28),
-((SELECT id FROM products WHERE name = 'Ankara Two-Piece Set'), (SELECT id FROM locations WHERE name = 'Lekki Suite'), 22),
-((SELECT id FROM products WHERE name = 'Nigerian Lace Fabric - Gold'), (SELECT id FROM locations WHERE name = 'Victoria Island'), 12),
-((SELECT id FROM products WHERE name = 'Leather Slides - Tan'), (SELECT id FROM locations WHERE name = 'Lekki Suite'), 45),
-((SELECT id FROM products WHERE name = 'Designer Heels - Red'), (SELECT id FROM locations WHERE name = 'Victoria Island'), 3),
-((SELECT id FROM products WHERE name = 'Leather Tote Bag - Cognac'), (SELECT id FROM locations WHERE name = 'Home Storage (Ikeja)'), 18);
+ALTER TABLE sales_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cash_drawer_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE operational_anomalies ENABLE ROW LEVEL SECURITY;

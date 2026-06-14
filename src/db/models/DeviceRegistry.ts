@@ -4,6 +4,9 @@ import { field, readonly, date } from '@nozbe/watermelondb/decorators';
 export class DeviceRegistry extends Model {
   static table = 'device_registry';
 
+  @field('store_id')
+  storeId?: string;
+
   @field('device_fingerprint')
   deviceFingerprint!: string;
 

@@ -1,24 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { database } from '../db';
 import { OperationalAnomaly } from '../db/models/OperationalAnomaly';
+import { Attendant } from '../db/models/Attendant';
+import { StoreAttendant } from '../db/models/StoreAttendant';
+import { useAuth } from '../context/AuthContext';
 
 interface Props {
-  onUnlock: () => void;
-  correctPinHash?: string;
+  onUnlock: (attendant: Attendant) => void;
+  storeId: string;
 }
 
-const AttendantPinLock: React.FC<Props> = ({ onUnlock, correctPinHash = '1234' }) => {
+const AttendantPinLock: React.FC<Props> = ({ onUnlock, storeId }) => {
   const [pin, setPin] = useState<string[]>([]);
   const [attempts, setAttempts] = useState<number>(0);
   const [error, setError] = useState<string>('');
+  const [attendants, setAttendants] = useState<Attendant[]>([]);
+  const { setCurrentAttendant } = useAuth();
+
+  // Load authorized attendants for store
+  useEffect(() => {
+    const loadAttendants = async () => {
+      // First get all store_attendant relationships for this store
+      const storeAttendants = await database
+        .get<StoreAttendant>('store_attendants')
+        .query()
+        .fetch();
+
+      const attendantIdsForStore = storeAttendants
+        .filter(sa => sa.storeId === storeId)
+        .map(sa => sa.attendantId);
+
+      // Then load those attendants
+      const allAttendants = await database
+        .get<Attendant>('attendants')
+        .query()
+        .fetch();
+
+      const authorizedAttendants = allAttendants.filter(a => 
+        attendantIdsForStore.includes(a.id)
+      );
+      setAttendants(authorizedAttendants);
+    };
+    loadAttendants();
+  }, [storeId]);
 
   const logAnomaly = async () => {
     await database.write(async () => {
       await database.get<OperationalAnomaly>('operational_anomalies').create((anomaly) => {
         anomaly.anomalyType = 'INVALID_PIN_ATTEMPTS';
         anomaly.severity = 'critical';
+        anomaly.storeId = storeId;
         anomaly.payload = JSON.stringify({ attempts: 3, timestamp: new Date().toISOString() });
         anomaly.createdAt = new Date();
       });
@@ -38,8 +71,14 @@ const AttendantPinLock: React.FC<Props> = ({ onUnlock, correctPinHash = '1234' }
   };
 
   const handleVerify = async () => {
-    if (pin.join('') === correctPinHash) {
-      onUnlock();
+    const pinString = pin.join('');
+    
+    // Find attendant with matching PIN
+    const validAttendant = attendants.find(a => a.hashedPin === pinString);
+
+    if (validAttendant) {
+      setCurrentAttendant?.(validAttendant);
+      onUnlock(validAttendant);
     } else {
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);

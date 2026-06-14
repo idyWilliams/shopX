@@ -4,6 +4,9 @@ import { field, readonly, date } from '@nozbe/watermelondb/decorators';
 export class OperationalAnomaly extends Model {
   static table = 'operational_anomalies';
 
+  @field('store_id')
+  storeId?: string;
+
   @field('anomaly_type')
   anomalyType!: string;
 
