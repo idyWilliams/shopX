@@ -131,7 +131,7 @@ export default function SettingsScreen() {
       </View>
 
       <Text className="mb-8 text-center text-xs text-zinc-600">
-        shopX v1.0.0 • Built with ❤️ for African retailers
+        shopX v1.0.0 • Built with care for African retailers
       </Text>
     </ScrollView>
   );

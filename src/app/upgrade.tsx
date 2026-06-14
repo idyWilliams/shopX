@@ -38,11 +38,11 @@ export default function UpgradeScreen() {
       setIsPurchasing(false);
       
       if (result.success) {
-        Alert.alert(
-          '🎉 Pro Activated!',
-          `Welcome to shopX Pro! Transaction ID: ${result.reference} via ${result.provider}`,
-          [{ text: 'Let\'s Go!', onPress: () => router.back() }]
-        );
+          Alert.alert(
+            'Pro Activated!',
+            `Welcome to shopX Pro! Transaction ID: ${result.transactionId}`,
+            [{ text: 'Let\'s Go!', onPress: () => router.back() }]
+          );
       } else {
         Alert.alert('Payment Failed', 'An error occurred during payment.');
       }

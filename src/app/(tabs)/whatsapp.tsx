@@ -34,7 +34,7 @@ const initialMockMessages: ChatMessage[] = [
     id: uuid(),
     sender_role: 'ai_manager',
     message_type: 'text',
-    text: '✅ Logged! Debt (Accounts Receivable) updated for Madam Grace: ₦17,000. Current stock: 46 bags.',
+    text: 'Logged! Debt (Accounts Receivable) updated for Madam Grace: ₦17,000. Current stock: 46 bags.',
     timestamp: new Date(Date.now() - 1740000).toISOString(),
     sender_name: 'shopX AI Manager',
   },
@@ -63,7 +63,7 @@ export default function WhatsAppScreen() {
           id: uuid(),
           sender_role: 'ai_manager',
           message_type: 'text',
-          text: '⚠️ Stock Alert: "Designer Heels - Red" at Victoria Island is running low (only 3 left). I\'ve drafted a restock request for you.',
+          text: 'Stock Alert: "Designer Heels - Red" at Victoria Island is running low (only 3 left). I\'ve drafted a restock request for you.',
           timestamp: new Date().toISOString(),
           sender_name: 'shopX Business Agent',
         },
@@ -71,7 +71,7 @@ export default function WhatsAppScreen() {
           id: uuid(),
           sender_role: 'ai_manager',
           message_type: 'text',
-          text: '📊 Performance Alert: Today\'s sales are 25% below your 7-day average. Consider running a small promotion.',
+          text: 'Performance Alert: Today\'s sales are 25% below your 7-day average. Consider running a small promotion.',
           timestamp: new Date(Date.now() - 60000).toISOString(),
           sender_name: 'shopX Business Agent',
         },
@@ -79,7 +79,7 @@ export default function WhatsAppScreen() {
           id: uuid(),
           sender_role: 'ai_manager',
           message_type: 'text',
-          text: '💸 Credit Alert: A large credit (₦50,000) was just logged for "Mr. Emeka". Keep an eye on this payment.',
+          text: 'Credit Alert: A large credit (₦50,000) was just logged for "Mr. Emeka". Keep an eye on this payment.',
           timestamp: new Date(Date.now() - 120000).toISOString(),
           sender_name: 'shopX Business Agent',
         }
@@ -114,7 +114,7 @@ export default function WhatsAppScreen() {
       id: uuid(),
       sender_role: 'ai_manager',
       message_type: 'text',
-      text: '📢 BROADCAST: Price update effective immediately. Ankara fabric prices increased by 5%. Please update all tags.',
+      text: 'BROADCAST: Price update effective immediately. Ankara fabric prices increased by 5%. Please update all tags.',
       timestamp: new Date().toISOString(),
       sender_name: 'shopX Business Agent',
     };
@@ -167,7 +167,7 @@ export default function WhatsAppScreen() {
           {item.transcription && (
             <View className="mt-3 p-3 bg-zinc-800/50 rounded-xl border border-zinc-700">
               <Text className="text-xs font-semibold text-zinc-500 mb-1">
-                🎤 AI Transcription
+                AI Transcription
               </Text>
               <Text className="text-sm text-zinc-300">{item.transcription}</Text>
             </View>
