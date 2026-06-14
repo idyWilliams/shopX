@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
 import type { ActivityFeed, Product, Location, ActivityType } from '../../types';
 import { useAuth } from '../../context/AuthContext';
+import { usePermissions } from '../../hooks/security';
 
 const ACTIVITY_COLORS: Record<ActivityType, string> = {
   sale: '#10B981',
@@ -23,16 +24,17 @@ const ACTIVITY_COLORS: Record<ActivityType, string> = {
   anomaly: '#F59E0B',
 };
 
-const ACTIVITY_ICONS: Record<ActivityType, string> = {
-  sale: '💰',
-  restock: '📦',
-  transfer: '🔄',
-  anomaly: '⚠️',
+const ACTIVITY_ICONS: Record<ActivityType, keyof typeof Feather.glyphMap> = {
+  sale: 'trending-up',
+  restock: 'package',
+  transfer: 'repeat',
+  anomaly: 'alert-triangle',
 };
 
 export default function FeedScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { profile, isLoading: permissionsLoading } = usePermissions();
   const [activities, setActivities] = useState<ActivityFeed[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -110,24 +112,27 @@ export default function FeedScreen() {
     if (!inputText.trim()) return;
 
     try {
+      if (!profile?.org_id) {
+        Alert.alert('Error', 'Organization not found');
+        return;
+      }
+      
       // Simple parsing (we'll improve this later)
       let type: ActivityType = 'sale';
       if (inputText.toLowerCase().includes('restock')) type = 'restock';
       if (inputText.toLowerCase().includes('transfer')) type = 'transfer';
       if (inputText.toLowerCase().includes('anomaly')) type = 'anomaly';
 
-      // Get org_id from first location (we'll improve this later with auth context)
-      const orgId = locations[0]?.org_id;
       const product = products[0]; // For now, pick first product
       const location = locations[0]; // For now, pick first location
 
-      if (!orgId || !product || !location) {
+      if (!product || !location) {
         Alert.alert('Error', 'No product or location found');
         return;
       }
 
       const { error } = await supabase.from('activities').insert({
-        org_id: orgId,
+        org_id: profile.org_id,
         type,
         product_id: product.id,
         quantity: 1,
@@ -165,7 +170,7 @@ export default function FeedScreen() {
               className="h-12 w-12 items-center justify-center rounded-full"
               style={{ backgroundColor: ACTIVITY_COLORS[item.type] + '20' }}
             >
-              <Text className="text-2xl">{ACTIVITY_ICONS[item.type]}</Text>
+              <Feather name={ACTIVITY_ICONS[item.type]} size={24} color={ACTIVITY_COLORS[item.type]} />
             </View>
             <View className="flex-1">
               <View className="flex-row items-center gap-2">

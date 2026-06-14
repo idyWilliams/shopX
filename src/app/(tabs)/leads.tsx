@@ -142,7 +142,7 @@ export default function LeadsScreen() {
               <Feather name="lock" size={24} color="#A1A1AA" />
             </View>
             <View className="flex-1">
-              <Text className="text-base font-semibold text-zinc-400">🔒 Premium Lead</Text>
+              <Text className="text-base font-semibold text-zinc-400">Premium Lead</Text>
               <Text className="text-sm text-zinc-500 mt-1">
                 {item.location} • {formatTimeAgo(item.timestamp)}
               </Text>

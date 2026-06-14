@@ -12,12 +12,14 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '../hooks/security';
 import type { Product, Location, Inventory } from '../types';
 
 export default function TransferScreen() {
   const router = useRouter();
   const { productId } = useLocalSearchParams<{ productId?: string }>();
   const { user } = useAuth();
+  const { profile, isLoading: permissionsLoading } = usePermissions();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -91,6 +93,11 @@ export default function TransferScreen() {
     }
 
     try {
+      if (!profile?.org_id) {
+        Alert.alert('Error', 'Organization not found');
+        return;
+      }
+      
       // Update inventory
       await Promise.all([
         // Decrease source location stock
@@ -115,25 +122,23 @@ export default function TransferScreen() {
               location_id: targetLocation.id,
               quantity: quantity,
               updated_at: new Date().toISOString(),
+              org_id: profile.org_id,
             });
           }
         })(),
       ]);
 
       // Insert transfer activity
-      const orgId = locations[0]?.org_id;
-      if (orgId) {
-        await supabase.from('activities').insert({
-          org_id: orgId,
-          type: 'transfer',
-          product_id: selectedProduct.id,
-          quantity: quantity,
-          source_location_id: sourceLocation.id,
-          target_location_id: targetLocation.id,
-          total_amount: 0,
-          recorded_by: user?.id,
-        });
-      }
+      await supabase.from('activities').insert({
+        org_id: profile.org_id,
+        type: 'transfer',
+        product_id: selectedProduct.id,
+        quantity: quantity,
+        source_location_id: sourceLocation.id,
+        target_location_id: targetLocation.id,
+        total_amount: 0,
+        recorded_by: user?.id,
+      });
 
       Alert.alert('Success', `Transferred ${quantity} units of ${selectedProduct.name}`, [
         { text: 'OK', onPress: () => router.back() },

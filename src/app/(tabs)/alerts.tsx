@@ -101,9 +101,10 @@ export default function AlertsScreen() {
                 <Text className="text-sm text-gray-400">{item.days_inactive} days inactive</Text>
               </View>
             </View>
-            <View className="mt-2 rounded-lg bg-gray-800 p-2">
+            <View className="mt-2 rounded-lg bg-gray-800 p-2 flex-row items-center gap-2">
+              <Feather name="map-pin" size={14} color="#9CA3AF" />
               <Text className="text-sm text-gray-300">
-                📍 {item.location_name}
+                {item.location_name}
               </Text>
             </View>
           </View>
@@ -149,9 +150,10 @@ export default function AlertsScreen() {
                   <Text className="text-sm text-gray-400">0 sales</Text>
                 </View>
               </View>
-              <View className="mt-2 rounded-lg bg-gray-800 p-2">
+              <View className="mt-2 rounded-lg bg-gray-800 p-2 flex-row items-center gap-2">
+                <Feather name="map-pin" size={14} color="#9CA3AF" />
                 <Text className="text-sm text-gray-300">
-                  📍 {location?.name || 'Unknown Location'}
+                  {location?.name || 'Unknown Location'}
                 </Text>
               </View>
             </View>
