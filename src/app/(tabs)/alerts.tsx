@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { supabaseMock } from '../../services/supabaseMock';
-import type { StaleStockAlert, FootTrafficEvent } from '../../types';
+import { supabase } from '../../lib/supabase';
+import type { StaleStockAlert, FootTrafficEvent, Product, Location, Inventory as InventoryType } from '../../types';
 
 interface ListItem {
   type: 'stale_header' | 'traffic_header' | 'stale' | 'traffic';
@@ -21,8 +21,58 @@ interface ListItem {
 }
 
 export default function AlertsScreen() {
-  const [staleAlerts] = useState<StaleStockAlert[]>(supabaseMock.getStaleStockAlerts());
-  const [trafficEvents] = useState<FootTrafficEvent[]>(supabaseMock.getFootTrafficEvents());
+  const [staleAlerts, setStaleAlerts] = useState<StaleStockAlert[]>([]);
+  const [trafficEvents, setTrafficEvents] = useState<FootTrafficEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+
+  // Fetch data from Supabase
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        
+        const [productsRes, locationsRes, inventoryRes] = await Promise.all([
+          supabase.from('products').select('*'),
+          supabase.from('locations').select('*'),
+          supabase.from('inventory').select('*').lt('quantity', 5), // Stale stock = < 5 units
+        ]);
+
+        if (productsRes.error) throw productsRes.error;
+        if (locationsRes.error) throw locationsRes.error;
+        if (inventoryRes.error) throw inventoryRes.error;
+
+        // Transform inventory data into stale stock alerts
+        const staleAlertsData: StaleStockAlert[] = (inventoryRes.data || []).map(inv => {
+          const product = (productsRes.data || []).find(p => p.id === inv.product_id);
+          const location = (locationsRes.data || []).find(l => l.id === inv.location_id);
+          
+          return {
+            id: inv.id,
+            product_id: inv.product_id,
+            location_id: inv.location_id,
+            quantity: inv.quantity,
+            days_inactive: 30, // Placeholder, we don't track activity dates yet
+            product_name: product?.name || 'Unknown Product',
+            location_name: location?.name || 'Unknown Location',
+          };
+        });
+
+        setProducts(productsRes.data || []);
+        setLocations(locationsRes.data || []);
+        setStaleAlerts(staleAlertsData);
+        setTrafficEvents([]); // Placeholder for now
+      } catch (error: any) {
+        console.error('Error fetching alerts data:', error);
+        Alert.alert('Error', error.message || 'Failed to load alerts');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const renderStaleStockAlert = (item: StaleStockAlert) => (
     <TouchableOpacity
@@ -67,7 +117,7 @@ export default function AlertsScreen() {
   );
 
   const renderTrafficAlert = (item: FootTrafficEvent) => {
-    const location = supabaseMock.getLocationById(item.location_id);
+    const location = locations.find(l => l.id === item.location_id);
 
     return (
       <TouchableOpacity
@@ -150,6 +200,15 @@ export default function AlertsScreen() {
     }
     return null;
   };
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-900">
+        <ActivityIndicator size="large" color="#06B6D4" />
+        <Text className="text-zinc-400 mt-4 text-sm">Loading alerts...</Text>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-gray-900">

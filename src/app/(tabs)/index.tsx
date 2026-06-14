@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,14 @@ import {
   RefreshControl,
   TextInput,
   Modal,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { supabaseMock } from '../../services/supabaseMock';
+import { supabase } from '../../lib/supabase';
 import type { ActivityFeed, Product, Location, ActivityType } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 
 const ACTIVITY_COLORS: Record<ActivityType, string> = {
   sale: '#10B981',
@@ -29,12 +32,42 @@ const ACTIVITY_ICONS: Record<ActivityType, string> = {
 
 export default function FeedScreen() {
   const router = useRouter();
-  const [activities, setActivities] = useState<ActivityFeed[]>(supabaseMock.getActivityFeed());
-  const [products] = useState<Product[]>(supabaseMock.getProducts());
-  const [locations] = useState<Location[]>(supabaseMock.getLocations());
+  const { user } = useAuth();
+  const [activities, setActivities] = useState<ActivityFeed[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showInput, setShowInput] = useState(false);
   const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      const [productsRes, locationsRes, activitiesRes] = await Promise.all([
+        supabase.from('products').select('*'),
+        supabase.from('locations').select('*'),
+        supabase.from('activities').select('*').order('timestamp', { ascending: false }),
+      ]);
+
+      if (productsRes.error) throw productsRes.error;
+      if (locationsRes.error) throw locationsRes.error;
+      if (activitiesRes.error) throw activitiesRes.error;
+
+      setProducts(productsRes.data || []);
+      setLocations(locationsRes.data || []);
+      setActivities(activitiesRes.data || []);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to load data');
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const getProduct = useCallback(
     (productId: string) => products.find((p) => p.id === productId),
@@ -70,40 +103,49 @@ export default function FeedScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => {
-      setActivities(supabaseMock.getActivityFeed());
-      setRefreshing(false);
-    }, 1000);
+    fetchData();
   }, []);
 
-  const handleSubmitInput = () => {
+  const handleSubmitInput = async () => {
     if (!inputText.trim()) return;
 
-    const parsed = supabaseMock.parseActivityInput(inputText);
-    if (parsed) {
-      const product = products.find((p) =>
-        p.name.toLowerCase().includes(parsed.item.toLowerCase())
-      );
-      const location = locations.find((l) =>
-        l.name.toLowerCase().includes(parsed.location.toLowerCase())
-      );
+    try {
+      // Simple parsing (we'll improve this later)
+      let type: ActivityType = 'sale';
+      if (inputText.toLowerCase().includes('restock')) type = 'restock';
+      if (inputText.toLowerCase().includes('transfer')) type = 'transfer';
+      if (inputText.toLowerCase().includes('anomaly')) type = 'anomaly';
 
-      if (product && location) {
-        const newActivity = supabaseMock.recordActivity({
-          org_id: supabaseMock.getOrganization().id,
-          type: parsed.action,
-          product_id: product.id,
-          quantity: parsed.qty,
-          source_location_id: parsed.action === 'sale' ? location.id : null,
-          target_location_id: parsed.action === 'restock' ? location.id : null,
-          total_amount: parsed.amount,
-          recorded_by: supabaseMock.getProfiles()[0].id,
-        });
-        setActivities([newActivity, ...activities]);
+      // Get org_id from first location (we'll improve this later with auth context)
+      const orgId = locations[0]?.org_id;
+      const product = products[0]; // For now, pick first product
+      const location = locations[0]; // For now, pick first location
+
+      if (!orgId || !product || !location) {
+        Alert.alert('Error', 'No product or location found');
+        return;
       }
+
+      const { error } = await supabase.from('activities').insert({
+        org_id: orgId,
+        type,
+        product_id: product.id,
+        quantity: 1,
+        source_location_id: type === 'sale' ? location.id : null,
+        target_location_id: type === 'restock' ? location.id : null,
+        total_amount: 0,
+        recorded_by: user?.id,
+      });
+
+      if (error) throw error;
+
+      // Refresh activities
+      await fetchData();
+      setInputText('');
+      setShowInput(false);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to record activity');
     }
-    setInputText('');
-    setShowInput(false);
   };
 
   const renderActivityCard = ({ item }: { item: ActivityFeed }) => {
@@ -172,6 +214,20 @@ export default function FeedScreen() {
     );
   };
 
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-900">
+        <ActivityIndicator size="large" color="#06B6D4" />
+        <Text className="text-zinc-400 mt-4 text-sm">Loading activity feed...</Text>
+      </View>
+    );
+  }
+
+  const organizationName = locations[0] ? (
+    // We'll get the actual org name from organizations table later
+    'My Business'
+  ) : 'My Business';
+
   return (
     <View className="flex-1 bg-gray-900">
       {/* Header */}
@@ -180,7 +236,7 @@ export default function FeedScreen() {
           <View>
             <Text className="text-2xl font-bold text-white">Activity Feed</Text>
             <Text className="text-sm text-gray-400">
-              {supabaseMock.getOrganization().name}
+              {organizationName}
             </Text>
           </View>
           <View className="flex-row gap-2">

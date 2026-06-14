@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,13 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
+import type { ActivityFeed } from '../types';
 
 const formatCurrency = (amount: number): string => {
   if (isNaN(amount)) {
@@ -24,15 +28,57 @@ const parseCurrencyInput = (text: string): number => {
 
 export default function HandoverScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [declaredCash, setDeclaredCash] = useState('');
   const [declaredTransfers, setDeclaredTransfers] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [result, setResult] = useState<'success' | 'discrepancy' | null>(null);
   const [variance, setVariance] = useState(0);
+  const [expectedCash, setExpectedCash] = useState(0);
+  const [expectedTransfers, setExpectedTransfers] = useState(0);
+  const [activities, setActivities] = useState<ActivityFeed[]>([]);
 
-  // Mock expected data
-  const expectedCash = 50000;
-  const expectedTransfers = 120000;
+  // Fetch today's activities
+  useEffect(() => {
+    const fetchTodayActivities = async () => {
+      try {
+        setIsLoading(true);
+
+        // Get today's date range
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const { data, error } = await supabase
+          .from('activities')
+          .select('*')
+          .eq('type', 'sale')
+          .gte('timestamp', today.toISOString())
+          .lt('timestamp', tomorrow.toISOString());
+
+        if (error) throw error;
+
+        // For now, split sales 50/50 between cash and transfers
+        // In a real app, you'd track payment method in the activity
+        const salesData = data || [];
+        const totalSales = salesData.reduce((sum, act) => sum + (act.total_amount || 0), 0);
+        
+        setExpectedCash(Math.round(totalSales * 0.5));
+        setExpectedTransfers(Math.round(totalSales * 0.5));
+        setActivities(salesData);
+      } catch (error: any) {
+        console.error('Error fetching today\'s activities:', error);
+        Alert.alert('Error', error.message || 'Failed to load shift data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTodayActivities();
+  }, []);
+
   const totalExpected = expectedCash + expectedTransfers;
 
   const handleSubmit = () => {
@@ -63,6 +109,15 @@ export default function HandoverScreen() {
     setVariance(0);
   };
 
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-zinc-950">
+        <ActivityIndicator size="large" color="#06B6D4" />
+        <Text className="text-zinc-400 mt-4 text-sm">Loading shift data...</Text>
+      </View>
+    );
+  }
+
   if (result) {
     return (
       <View className="flex-1 bg-zinc-950 px-6 pt-8 pb-20">
@@ -75,7 +130,7 @@ export default function HandoverScreen() {
               </Text>
             </View>
             <Text className="text-zinc-300">
-              Ikeja Branch shift closed with a {formatCurrency(variance)} shortfall. Review logs.
+              Branch shift closed with a {formatCurrency(variance)} shortfall. Review logs.
             </Text>
           </View>
         )}
