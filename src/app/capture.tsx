@@ -135,18 +135,42 @@ export default function CaptureScreen() {
     }
   };
 
-  const handleProcessInput = () => {
+  const handleProcessInput = async () => {
     if (!inputText.trim()) return;
 
     setStatus('ANALYZING');
     startPulseAnimation();
 
-    setTimeout(() => {
-      const result = parseActivityInput(inputText);
-      setParsedResult(result);
-      setStatus('CONFIRMING');
+    try {
+      // First, if we have an image, upload it to get a public URL
+      let imageUrl = null;
+      if (capturedImage && profile?.org_id) {
+        imageUrl = await uploadImage(capturedImage, profile.org_id);
+      }
+
+      const { data, error } = await supabase.functions.invoke('parse-activity', {
+        body: {
+          text: inputText,
+          imageUrl: imageUrl,
+        },
+      });
+
+      if (error) throw error;
+      
+      if (data && data.activity) {
+        setParsedResult(data.activity);
+        setProcessedImageUrl(imageUrl);
+        setStatus('CONFIRMING');
+      } else {
+        throw new Error('Failed to parse activity');
+      }
+    } catch (error: any) {
+      console.error('Error processing input:', error);
+      Alert.alert('Error', error.message || 'Failed to process your input. Please try again.');
+      setStatus('IDLE');
+    } finally {
       stopPulseAnimation();
-    }, 2000);
+    }
   };
 
   const uploadImage = async (fileUri: string, orgId: string): Promise<string | null> => {
@@ -185,6 +209,8 @@ export default function CaptureScreen() {
     }
   };
 
+  const [processedImageUrl, setProcessedImageUrl] = useState<string | null>(null);
+
   const handleConfirmActivity = async () => {
     if (!parsedResult) return;
 
@@ -208,12 +234,6 @@ export default function CaptureScreen() {
         return;
       }
 
-      let uploadedImageUrl: string | null = null;
-      
-      if (capturedImage) {
-        uploadedImageUrl = await uploadImage(capturedImage, profile.org_id);
-      }
-
       // Create activity record in Supabase
       const { error } = await supabase
         .from('activities')
@@ -226,8 +246,8 @@ export default function CaptureScreen() {
           target_location_id: parsedResult.action === 'restock' ? location.id : null,
           total_amount: parsedResult.amount,
           timestamp: new Date().toISOString(),
-          image_url: uploadedImageUrl,
-          payment_method: parsedResult.amount > 0 ? 'cash' : null, // simple for now, can add selection later
+          image_url: processedImageUrl,
+          payment_method: parsedResult.paymentMethod || (parsedResult.amount > 0 ? 'cash' : null),
         }]);
       
       if (error) throw error;
