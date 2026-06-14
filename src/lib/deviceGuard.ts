@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { database } from '../db';
 import { DeviceRegistry } from '../db/models/DeviceRegistry';
+import { OperationalAnomaly } from '../db/models/OperationalAnomaly';
 
 const getDeviceFingerprint = (): string => {
   const deviceInfo = [
@@ -20,6 +21,17 @@ const getDeviceFingerprint = (): string => {
   return Math.abs(hash).toString(16).padStart(8, '0');
 };
 
+const logUnauthorizedDeviceAnomaly = async (fingerprint: string) => {
+  await database.write(async () => {
+    await database.get<OperationalAnomaly>('operational_anomalies').create((anomaly) => {
+      anomaly.anomalyType = 'UNAUTHORIZED_DEVICE_ATTEMPT';
+      anomaly.severity = 'critical';
+      anomaly.payload = JSON.stringify({ fingerprint, timestamp: new Date().toISOString() });
+      anomaly.createdAt = new Date();
+    });
+  });
+};
+
 export const checkDeviceAuthorization = async (): Promise<boolean> => {
   const fingerprint = getDeviceFingerprint();
 
@@ -27,7 +39,8 @@ export const checkDeviceAuthorization = async (): Promise<boolean> => {
 
   const matchingDevice = devices.find(d => d.deviceFingerprint === fingerprint);
 
-  if (!matchingDevice || !matchingDevice.isTrusted === false) {
+  if (!matchingDevice || !matchingDevice.isTrusted) {
+    await logUnauthorizedDeviceAnomaly(fingerprint);
     return false;
   }
 

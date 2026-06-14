@@ -11,6 +11,19 @@ import { Audio } from 'expo-av';
 import { supabase } from '../lib/supabase';
 import { database } from '../db';
 import { SalesEvent } from '../db/models/SalesEvent';
+import { OperationalAnomaly } from '../db/models/OperationalAnomaly';
+import { Product } from '../db/models/Product';
+
+const logDataIntegrityAnomaly = async (command: string, details: any) => {
+  await database.write(async () => {
+    await database.get<OperationalAnomaly>('operational_anomalies').create((anomaly) => {
+      anomaly.anomalyType = 'DATA_INTEGRITY_VIOLATION';
+      anomaly.severity = 'medium';
+      anomaly.payload = JSON.stringify({ command, details, timestamp: new Date().toISOString() });
+      anomaly.createdAt = new Date();
+    });
+  });
+};
 
 const VoiceLedger: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
@@ -58,6 +71,22 @@ const VoiceLedger: React.FC = () => {
       });
 
       if (error) throw error;
+
+      // Validate data integrity: check for valid SKU or product
+      const products = await database.get<Product>('products').query().fetch();
+      const productExists = products.some(p => 
+        p.name.toLowerCase().includes(data.productName?.toLowerCase() || '')
+      );
+
+      if (!productExists && data.productName) {
+        await logDataIntegrityAnomaly(audioUri, {
+          invalidProduct: data.productName,
+          reason: 'Product not found in inventory'
+        });
+        Alert.alert('Validation Error', 'Product not recognized. Please try again.');
+        return;
+      }
+
       setConfirmed(data);
     } catch (error) {
       console.error('Error processing voice command:', error);
