@@ -51,15 +51,17 @@ export default function AuthScreen() {
   }, []);
 
   const handleSendOtp = async () => {
-    const identifier = authMethod === 'email' ? email.trim() : `+${callingCode}${phone.trim()}`;
+    // Sanitize phone: remove leading zero if it exists and remove all non-numeric characters
+    const sanitizedPhone = phone.trim().replace(/^0+/, '').replace(/\D/g, '');
+    const identifier = authMethod === 'email' ? email.trim() : `+${callingCode}${sanitizedPhone}`;
     
     if (authMethod === 'email' && (!email.trim() || !email.includes('@'))) {
       Alert.alert('Invalid Email', 'Please enter a valid email address');
       return;
     }
     
-    if (authMethod === 'phone' && (!phone.trim() || phone.length < 7)) {
-      Alert.alert('Invalid Phone', 'Please enter a valid phone number');
+    if (authMethod === 'phone' && (!sanitizedPhone || sanitizedPhone.length < 7)) {
+      Alert.alert('Invalid Phone', 'Please enter a valid phone number without the leading zero.');
       return;
     }
 
@@ -71,7 +73,7 @@ export default function AuthScreen() {
       if (authMethod === 'email') {
         await AsyncStorage.setItem('@shopx_email', email);
       } else {
-        await AsyncStorage.setItem('@shopx_phone', phone);
+        await AsyncStorage.setItem('@shopx_phone', phone); // Save the raw input for UX
         await AsyncStorage.setItem('@shopx_country_code', countryCode);
         await AsyncStorage.setItem('@shopx_calling_code', callingCode);
       }
