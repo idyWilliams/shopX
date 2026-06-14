@@ -13,12 +13,14 @@ import { database } from '../db';
 import { SalesEvent } from '../db/models/SalesEvent';
 import { OperationalAnomaly } from '../db/models/OperationalAnomaly';
 import { Product } from '../db/models/Product';
+import { useAuth } from '../context/AuthContext';
 
-const logDataIntegrityAnomaly = async (command: string, details: any) => {
+const logDataIntegrityAnomaly = async (command: string, details: any, storeId: string | null) => {
   await database.write(async () => {
     await database.get<OperationalAnomaly>('operational_anomalies').create((anomaly) => {
       anomaly.anomalyType = 'DATA_INTEGRITY_VIOLATION';
       anomaly.severity = 'medium';
+      anomaly.storeId = storeId;
       anomaly.payload = JSON.stringify({ command, details, timestamp: new Date().toISOString() });
       anomaly.createdAt = new Date();
     });
@@ -30,6 +32,7 @@ const VoiceLedger: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [confirmed, setConfirmed] = useState<any>(null);
+  const { activeStoreId, currentAttendant } = useAuth();
 
   const startRecording = async () => {
     try {
@@ -82,7 +85,7 @@ const VoiceLedger: React.FC = () => {
         await logDataIntegrityAnomaly(audioUri, {
           invalidProduct: data.productName,
           reason: 'Product not found in inventory'
-        });
+        }, activeStoreId);
         Alert.alert('Validation Error', 'Product not recognized. Please try again.');
         return;
       }
@@ -103,9 +106,11 @@ const VoiceLedger: React.FC = () => {
     try {
       await database.write(async () => {
         await database.get<SalesEvent>('sales_events').create((event) => {
+          event.storeId = activeStoreId;
           event.eventType = confirmed.action;
           event.quantity = confirmed.quantity;
           event.priceAtSale = confirmed.price || 0;
+          event.attendantId = currentAttendant?.id;
           event.createdAt = new Date();
         });
       });
@@ -129,6 +134,11 @@ const VoiceLedger: React.FC = () => {
         <Text className="text-sm text-zinc-400">
           Speak your transactions naturally
         </Text>
+        {activeStoreId && (
+          <Text className="text-xs text-cyan-400 mt-2">
+          Active Store: {activeStoreId}
+          </Text>
+        )}
       </View>
 
       {!confirmed ? (

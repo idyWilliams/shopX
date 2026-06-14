@@ -4,6 +4,9 @@ import { field, readonly, date } from '@nozbe/watermelondb/decorators';
 export class Product extends Model {
   static table = 'products';
 
+  @field('store_id')
+  storeId?: string;
+
   @field('name')
   name!: string;
 

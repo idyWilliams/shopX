@@ -7,7 +7,7 @@ import { checkDeviceAuthorization } from '../lib/deviceGuard';
 import TerminalUnauthorizedScreen from '../components/TerminalUnauthorizedScreen';
 
 function RootLayoutNav() {
-  const { session, loading } = useAuth();
+  const { session, loading, activeStoreId, authorizedStores, currentAttendant } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const [deviceChecked, setDeviceChecked] = useState<boolean>(false);
@@ -30,15 +30,30 @@ function RootLayoutNav() {
   }, []);
 
   useEffect(() => {
-    if (loading || !deviceChecked === false) return;
-    const inAuthGroup = segments[0] === 'auth';
+    if (loading || !deviceChecked) return;
 
-    if (!session && !inAuthGroup) {
+    const inAuthGroup = segments[0] === 'auth';
+    const inSelectShopGroup = segments[0] === 'select-shop';
+    const inOnboarding = segments[0] === 'onboarding';
+
+    if (!session && !inAuthGroup && !inOnboarding) {
       router.replace('/auth');
-    } else if (session && inAuthGroup) {
-      router.replace('/(tabs)');
+    } else if (session) {
+      if (inAuthGroup) {
+        // Check if we need to select a shop or go to tabs
+        if (!activeStoreId && authorizedStores.length > 1) {
+          router.replace('/select-shop');
+        } else if (!activeStoreId && authorizedStores.length === 1) {
+          // Auto-select the only store
+          router.replace('/(tabs)');
+        } else if (activeStoreId) {
+          router.replace('/(tabs)');
+        }
+      } else if (!inSelectShopGroup && !inOnboarding && !activeStoreId && authorizedStores.length > 1) {
+        router.replace('/select-shop');
+      }
     }
-  }, [session, loading, segments, deviceChecked]);
+  }, [session, loading, segments, deviceChecked, activeStoreId, authorizedStores]);
 
   if (loading || !deviceChecked) {
     return (
@@ -56,6 +71,8 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="auth" options={{ headerShown: false }} />
+      <Stack.Screen name="select-shop" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
     </Stack>
   );
 }
