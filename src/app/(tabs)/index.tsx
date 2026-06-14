@@ -43,6 +43,30 @@ export default function FeedScreen() {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
+  // Calculate today's sales
+  const todaysSales = useCallback(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    return activities
+      .filter(a => {
+        const timestamp = new Date(a.timestamp);
+        return (
+          a.activity_type === 'sale' &&
+          timestamp >= todayStart &&
+          timestamp <= todayEnd
+        );
+      })
+      .reduce((sum, a) => sum + (a.amount || 0), 0);
+  }, [activities]);
+
+  // Calculate active stock
+  const activeStock = useCallback(() => {
+    return products.reduce((sum, product) => sum + (product.stock_quantity || 0), 0);
+  }, [products]);
+
   const fetchData = async () => {
     try {
       setIsLoading(true);
@@ -286,14 +310,14 @@ export default function FeedScreen() {
             <Feather name="trending-up" color="#10B981" size={20} />
             <View>
               <Text className="text-xs text-gray-400">Today's Sales</Text>
-              <Text className="text-lg font-bold text-white">₦66,000</Text>
+              <Text className="text-lg font-bold text-white">{formatCurrency(todaysSales())}</Text>
             </View>
           </TouchableOpacity>
           <TouchableOpacity className="flex-1 flex-row items-center gap-2 rounded-xl bg-gray-800 p-3">
             <Feather name="package" color="#3B82F6" size={20} />
             <View>
               <Text className="text-xs text-gray-400">Active Stock</Text>
-              <Text className="text-lg font-bold text-white">247</Text>
+              <Text className="text-lg font-bold text-white">{activeStock()}</Text>
             </View>
           </TouchableOpacity>
         </View>
