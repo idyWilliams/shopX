@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, FlatList, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import type { ChatMessage } from '../../types';
+import type { ChatMessage, Location } from '../../types';
 import whatsappService from '../../lib/whatsapp';
 import { useSubscription } from '../../hooks/security';
+import { usePermissions } from '../../hooks/security';
+import { supabase } from '../../lib/supabase';
+import type { Product, ActivityFeed } from '../../types';
 
 const uuid = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -12,33 +15,6 @@ const uuid = () => {
     return v.toString(16);
   });
 };
-
-const BRANCHES = [
-  { id: 'all', name: 'All Branches' },
-  { id: 'ikeja', name: 'Ikeja Branch Staff' },
-  { id: 'lekki', name: 'Lekki Management' },
-  { id: 'vi', name: 'Victoria Island' },
-];
-
-const initialMockMessages: ChatMessage[] = [
-  {
-    id: uuid(),
-    sender_role: 'staff',
-    message_type: 'audio',
-    text: 'Voice Note (0:23)',
-    transcription: 'Translated from Audio: "Madam Grace carried 2 bags of Dangote, she said she will pay balance tomorrow"',
-    timestamp: new Date(Date.now() - 1800000).toISOString(),
-    sender_name: 'Chidi (Ikeja)',
-  },
-  {
-    id: uuid(),
-    sender_role: 'ai_manager',
-    message_type: 'text',
-    text: 'Logged! Debt (Accounts Receivable) updated for Madam Grace: ₦17,000. Current stock: 46 bags.',
-    timestamp: new Date(Date.now() - 1740000).toISOString(),
-    sender_name: 'shopX AI Manager',
-  },
-];
 
 const formatTime = (timestamp: string) => {
   const date = new Date(timestamp);
@@ -50,48 +26,105 @@ const formatTime = (timestamp: string) => {
 };
 
 export default function WhatsAppScreen() {
+  const { profile, isLoading: permissionsLoading } = usePermissions();
   const [activeBranch, setActiveBranch] = useState('all');
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMockMessages);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [activities, setActivities] = useState<ActivityFeed[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { hasProAccess, isInTrial } = useSubscription();
 
-  // Proactive Business Agent alerts - simulate on mount
-  useEffect(() => {
-    const sendProactiveAlerts = () => {
-      const alerts: ChatMessage[] = [
-        {
+  const fetchData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const [productsRes, activitiesRes, locationsRes] = await Promise.all([
+        supabase.from('products').select('*'),
+        supabase.from('activities').select('*').order('timestamp', { ascending: false }),
+        supabase.from('locations').select('*')
+      ]);
+      if (productsRes.error) throw productsRes.error;
+      if (activitiesRes.error) throw activitiesRes.error;
+      if (locationsRes.error) throw locationsRes.error;
+      setProducts(productsRes.data || []);
+      setActivities(activitiesRes.data || []);
+      setLocations(locationsRes.data || []);
+    } catch (err) {
+      console.error('Failed to load data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Generate dynamic messages based on real data
+  const generateDynamicMessages = useCallback((productsList: Product[], activitiesList: ActivityFeed[]): ChatMessage[] => {
+    const dynamicMessages: ChatMessage[] = [];
+
+    // Find first low stock product
+    const lowStockProduct = productsList.find(p => (p.stock_quantity || 0) < 10);
+    if (lowStockProduct) {
+      dynamicMessages.push({
+        id: uuid(),
+        sender_role: 'ai_manager',
+        message_type: 'text',
+        text: `Stock Alert: "${lowStockProduct.name}" is running low (only ${lowStockProduct.stock_quantity} left). I've drafted a restock request for you.`,
+        timestamp: new Date().toISOString(),
+        sender_name: 'shopX Business Agent',
+      });
+    }
+
+    // Find recent credit activity
+    const recentActivity = activitiesList[0];
+    if (recentActivity) {
+      if (recentActivity.activity_type === 'sale' && recentActivity.amount) {
+        dynamicMessages.push({
           id: uuid(),
           sender_role: 'ai_manager',
           message_type: 'text',
-          text: 'Stock Alert: "Designer Heels - Red" at Victoria Island is running low (only 3 left). I\'ve drafted a restock request for you.',
-          timestamp: new Date().toISOString(),
-          sender_name: 'shopX Business Agent',
-        },
-        {
-          id: uuid(),
-          sender_role: 'ai_manager',
-          message_type: 'text',
-          text: 'Performance Alert: Today\'s sales are 25% below your 7-day average. Consider running a small promotion.',
+          text: `Sales Alert: A sale of ${recentActivity.amount ? new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(recentActivity.amount) : 'an amount'} was just logged.`,
           timestamp: new Date(Date.now() - 60000).toISOString(),
           sender_name: 'shopX Business Agent',
-        },
-        {
-          id: uuid(),
-          sender_role: 'ai_manager',
-          message_type: 'text',
-          text: 'Credit Alert: A large credit (₦50,000) was just logged for "Mr. Emeka". Keep an eye on this payment.',
-          timestamp: new Date(Date.now() - 120000).toISOString(),
-          sender_name: 'shopX Business Agent',
-        }
-      ];
-      setMessages(prev => [...prev, ...alerts]);
-    };
-
-    // Only send proactive alerts if Pro or in trial
-    if (hasProAccess) {
-      sendProactiveAlerts();
+        });
+      }
     }
-  }, [hasProAccess]);
+
+    // Default fallback messages
+    if (dynamicMessages.length === 0) {
+      dynamicMessages.push({
+        id: uuid(),
+        sender_role: 'ai_manager',
+        message_type: 'text',
+        text: 'Welcome to shopX Business Agent! You can ask questions about your sales, inventory, or request reports.',
+        timestamp: new Date(Date.now() - 1800000).toISOString(),
+        sender_name: 'shopX Business Agent',
+      });
+    }
+
+    return dynamicMessages;
+  }, []);
+
+  // Fetch data on mount
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Prepare branches options
+  const branches = [
+    { id: 'all', name: 'All Branches' },
+    ...locations.map(loc => ({
+      id: loc.id,
+      name: loc.name
+    }))
+  ];
+
+  // Once data loads, set initial messages
+  useEffect(() => {
+    if (!isLoading && (products.length > 0 || activities.length > 0 || locations.length > 0)) {
+      const initialMessages = generateDynamicMessages(products, activities);
+      setMessages(initialMessages);
+    }
+  }, [isLoading, products, activities, generateDynamicMessages, locations]);
 
   const handleSendMessage = () => {
     if (!inputText.trim()) return;
@@ -193,6 +226,15 @@ export default function WhatsAppScreen() {
     );
   };
 
+  if (isLoading || permissionsLoading) {
+    return (
+      <View className="flex-1 bg-zinc-950 items-center justify-center">
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <Text className="text-zinc-400 mt-4">Loading...</Text>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-zinc-950">
       {/* Status Header */}
@@ -205,7 +247,7 @@ export default function WhatsAppScreen() {
         </View>
 
         <FlatList
-          data={BRANCHES}
+          data={branches}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerClassName="gap-2 pb-2"

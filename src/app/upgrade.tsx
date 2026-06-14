@@ -6,6 +6,9 @@ import { usePermissions, useSubscription } from '../hooks/security';
 import { generatePaymentReference } from '../lib/payments';
 import { initiateTransaction } from '../lib/paymentRouter';
 
+const PRO_PRICE = 2500; // NGN per month
+const PRO_PRICE_FORMATTED = new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(PRO_PRICE);
+
 const PricingFeature = ({ icon, text }: { icon: string; text: string }) => (
   <View className="flex-row items-center gap-3 py-2">
     <View className="h-6 w-6 items-center justify-center rounded-full bg-emerald-500/10">
@@ -29,7 +32,7 @@ export default function UpgradeScreen() {
       
       // Process payment with our router
       const result = await initiateTransaction({
-        amount: 2500,
+        amount: PRO_PRICE,
         currency: 'NGN',
         type: 'card',
         reference: reference,
@@ -80,7 +83,7 @@ export default function UpgradeScreen() {
               Pro
             </Text>
             <Text className="text-5xl font-bold text-white">
-              ₦2,500
+              {PRO_PRICE_FORMATTED}
             </Text>
             <Text className="text-sm text-zinc-400">per month</Text>
           </View>
@@ -138,7 +141,7 @@ export default function UpgradeScreen() {
             <Text className="text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-2">
               Pro
             </Text>
-            <Text className="text-2xl font-bold text-white">₦2,500</Text>
+            <Text className="text-2xl font-bold text-white">{PRO_PRICE_FORMATTED}</Text>
           </View>
         </View>
 

@@ -12,7 +12,8 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import type { ActivityFeed } from '../types';
+import { usePermissions } from '../hooks/security';
+import type { ActivityFeed, Location } from '../types';
 
 const formatCurrency = (amount: number): string => {
   if (isNaN(amount)) {
@@ -29,6 +30,7 @@ const parseCurrencyInput = (text: string): number => {
 export default function HandoverScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { profile, isLoading: permissionsLoading } = usePermissions();
   const [declaredCash, setDeclaredCash] = useState('');
   const [declaredTransfers, setDeclaredTransfers] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,8 +40,9 @@ export default function HandoverScreen() {
   const [expectedCash, setExpectedCash] = useState(0);
   const [expectedTransfers, setExpectedTransfers] = useState(0);
   const [activities, setActivities] = useState<ActivityFeed[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
 
-  // Fetch today's activities
+  // Fetch today's activities and locations
   useEffect(() => {
     const fetchTodayActivities = async () => {
       try {
@@ -51,16 +54,18 @@ export default function HandoverScreen() {
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        const { data, error } = await supabase
-          .from('activities')
-          .select('*')
-          .eq('type', 'sale')
-          .gte('timestamp', today.toISOString())
-          .lt('timestamp', tomorrow.toISOString());
+        const [activitiesRes, locationsRes] = await Promise.all([
+          supabase.from('activities').select('*')
+            .eq('type', 'sale')
+            .gte('timestamp', today.toISOString())
+            .lt('timestamp', tomorrow.toISOString()),
+          supabase.from('locations').select('*')
+        ]);
 
-        if (error) throw error;
+        if (activitiesRes.error) throw activitiesRes.error;
+        if (locationsRes.error) throw locationsRes.error;
 
-        const salesData = data || [];
+        const salesData = activitiesRes.data || [];
         const cashTotal = salesData.reduce((sum, act) => {
           if (act.payment_method === 'cash') {
             return sum + (act.total_amount || 0);
@@ -78,6 +83,7 @@ export default function HandoverScreen() {
         setExpectedCash(cashTotal);
         setExpectedTransfers(transferTotal);
         setActivities(salesData);
+        setLocations(locationsRes.data || []);
       } catch (error: any) {
         console.error('Error fetching today\'s activities:', error);
         Alert.alert('Error', error.message || 'Failed to load shift data');
@@ -119,7 +125,7 @@ export default function HandoverScreen() {
     setVariance(0);
   };
 
-  if (isLoading) {
+  if (isLoading || permissionsLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-zinc-950">
         <ActivityIndicator size="large" color="#06B6D4" />
@@ -127,6 +133,9 @@ export default function HandoverScreen() {
       </View>
     );
   }
+
+  // Get the location name (default to first location or "Shop Location")
+  const currentLocation = locations[0]?.name || "Shop Location";
 
   if (result) {
     return (
@@ -253,7 +262,7 @@ export default function HandoverScreen() {
           <View className="flex-row items-center gap-2 mb-1">
             <Feather name="map-pin" size={16} color="#71717A" />
             <Text className="text-xs text-zinc-500 uppercase tracking-wider">
-              Ikeja Branch
+              {currentLocation}
             </Text>
           </View>
           <Text className="text-2xl font-bold text-zinc-50">
