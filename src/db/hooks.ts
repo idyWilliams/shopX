@@ -1,30 +1,56 @@
-import { useQuery } from '@nozbe/watermelondb/react';
-import { database } from './index';
+import { useState, useEffect } from 'react';
+import { getDatabase } from './index';
 import { OperationalAnomaly } from './models/OperationalAnomaly';
 import { SalesEvent } from './models/SalesEvent';
 import { Lead } from './models/Lead';
 
 export const useAnomalies = () => {
-  const anomaliesQuery = database
-    .get<OperationalAnomaly>('operational_anomalies')
-    .query();
+  const [anomalies, setAnomalies] = useState<OperationalAnomaly[]>([]);
   
-  return useQuery(anomaliesQuery);
+  useEffect(() => {
+    const db = getDatabase();
+    const subscription = db
+      .get<OperationalAnomaly>('operational_anomalies')
+      .query()
+      .observe()
+      .subscribe(setAnomalies);
+    
+    return () => subscription.unsubscribe();
+  }, []);
+  
+  return anomalies;
 };
 
 export const useSalesEvents = () => {
-  const salesQuery = database
-    .get<SalesEvent>('sales_events')
-    .query();
+  const [salesEvents, setSalesEvents] = useState<SalesEvent[]>([]);
   
-  return useQuery(salesQuery);
+  useEffect(() => {
+    const db = getDatabase();
+    const subscription = db
+      .get<SalesEvent>('sales_events')
+      .query()
+      .observe()
+      .subscribe(setSalesEvents);
+    
+    return () => subscription.unsubscribe();
+  }, []);
+  
+  return salesEvents;
 };
 
 export const useLeads = () => {
-  const leadsQuery = database
-    .get<Lead>('leads')
-    .query()
-    .observe();
+  const [leads, setLeads] = useState<Lead[]>([]);
   
-  return useQuery(leadsQuery);
+  useEffect(() => {
+    const db = getDatabase();
+    const subscription = db
+      .get<Lead>('leads')
+      .query()
+      .observe()
+      .subscribe(setLeads);
+    
+    return () => subscription.unsubscribe();
+  }, []);
+  
+  return leads;
 };

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { database } from '../db';
+import { getDatabase } from '../db';
 import { Merchant } from '../db/models/Merchant';
 import { Store } from '../db/models/Store';
 import { Attendant } from '../db/models/Attendant';
@@ -113,10 +113,11 @@ const Onboarding = () => {
   const completeSoloOwnerOnboarding = async () => {
     try {
       let createdMerchantId = '';
+      const db = getDatabase();
 
       // 1. Create Merchant
-      await database.write(async () => {
-        const merchant = await database.get<Merchant>('merchants').create(m => {
+      await db.write(async () => {
+        const merchant = await db.get<Merchant>('merchants').create(m => {
           m.email = merchantEmail;
           m.phone = merchantPhone;
         });
@@ -126,8 +127,12 @@ const Onboarding = () => {
       // 2. Create Default Store
       const defaultStore = await createDefaultStore(createdMerchantId);
 
-      // 3. Register Device for default store
-      await registerDevice(defaultStore.id);
+      // 3. Register Device for default store (ignore errors for solo owner)
+      try {
+        await registerDevice(defaultStore.id);
+      } catch (registerError) {
+        console.warn('Device registration failed (solo owner, continuing):', registerError);
+      }
 
       // 4. Update auth context
       setSoloOwner(true);
@@ -151,10 +156,11 @@ const Onboarding = () => {
     try {
       let createdMerchantId = '';
       const createdStoreIds: Record<string, string> = {}; // maps store name to id
+      const db = getDatabase();
 
       // 1. Create Merchant
-      await database.write(async () => {
-        const merchant = await database.get<Merchant>('merchants').create(m => {
+      await db.write(async () => {
+        const merchant = await db.get<Merchant>('merchants').create(m => {
           m.email = merchantEmail;
           m.phone = merchantPhone;
         });
@@ -163,8 +169,8 @@ const Onboarding = () => {
 
       // 2. Create Stores
       for (const store of stores.filter(s => s.name)) {
-        await database.write(async () => {
-          const newStore = await database.get<Store>('stores').create(s => {
+        await db.write(async () => {
+          const newStore = await db.get<Store>('stores').create(s => {
             s.merchantId = createdMerchantId;
             s.name = store.name;
             s.locationAddress = store.location;
@@ -177,8 +183,8 @@ const Onboarding = () => {
       if (!isSoloOwner) {
         for (const attendant of attendants.filter(a => a.name && a.pin)) {
           let createdAttendantId = '';
-          await database.write(async () => {
-            const newAttendant = await database
+          await db.write(async () => {
+            const newAttendant = await db
               .get<Attendant>('attendants')
               .create(a => {
                 a.name = attendant.name;
@@ -191,8 +197,8 @@ const Onboarding = () => {
           // Create store_attendant relationships
           for (const storeName of attendant.assignedStores) {
             if (createdStoreIds[storeName]) {
-              await database.write(async () => {
-                await database.get<StoreAttendant>('store_attendants').create(sa => {
+              await db.write(async () => {
+                await db.get<StoreAttendant>('store_attendants').create(sa => {
                   sa.storeId = createdStoreIds[storeName];
                   sa.attendantId = createdAttendantId;
                 });
@@ -206,13 +212,17 @@ const Onboarding = () => {
       const targetStoreId = isSoloOwner 
         ? (await createDefaultStore(createdMerchantId)).id 
         : createdStoreIds[selectedStoreForDevice];
-      await registerDevice(targetStoreId);
+      try {
+        await registerDevice(targetStoreId);
+      } catch (registerError) {
+        console.warn('Device registration failed, continuing:', registerError);
+      }
 
       // 5. Update auth context
       setSoloOwner(isSoloOwner);
       setActiveStoreId?.(targetStoreId);
       // Load all stores into authorizedStores
-      const loadedStores = await database.get<Store>('stores').query().fetch();
+      const loadedStores = await db.get<Store>('stores').query().fetch();
       setAuthorizedStores?.(loadedStores);
 
       Alert.alert('Success', 'Onboarding complete!');

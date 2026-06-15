@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { database } from '../db';
+import { getDatabase } from '../db';
 import { Product } from '../db/models/Product';
 import { SalesEvent } from '../db/models/SalesEvent';
 import type { StaleStockAlert, FootTrafficEvent } from '../types';
@@ -31,8 +31,9 @@ export function useBusinessPulse(): BusinessPulseState & BusinessPulseActions {
     const now = new Date();
 
     try {
-      const products = await database.get<Product>('products').query().fetch();
-      const salesEvents = await database.get<SalesEvent>('sales_events').query().fetch();
+      const db = getDatabase();
+      const products = await db.get<Product>('products').query().fetch();
+      const salesEvents = await db.get<SalesEvent>('sales_events').query().fetch();
 
       for (const product of products) {
         const productSales = salesEvents.filter(

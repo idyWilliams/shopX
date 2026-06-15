@@ -68,12 +68,7 @@ export const generateShopReport = async (
   }
 
   try {
-    await Sharing.shareAsync({
-      mimeType: 'text/plain',
-      dialogTitle: 'Share ShopX Report',
-      UTI: 'public.plain-text',
-      message: reportText,
-    });
+    await Sharing.shareAsync(reportText);
   } catch (error) {
     console.error('Error sharing report:', error);
     // Fallback: log the report text if sharing fails
@@ -92,12 +87,7 @@ export const contactLeadOnWhatsApp = async (
     await Linking.openURL(whatsappUrl);
   } catch (error) {
     console.error('Error opening WhatsApp:', error);
-    await Sharing.shareAsync({
-      mimeType: 'text/plain',
-      dialogTitle: 'Contact Lead',
-      UTI: 'public.plain-text',
-      message: message,
-    });
+    await Sharing.shareAsync(message);
   }
 };
 

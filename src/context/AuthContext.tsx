@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { database } from '../db';
+import { getDatabase } from '../db';
 import { Store } from '../db/models/Store';
 import { Attendant } from '../db/models/Attendant';
 import { StoreAttendant } from '../db/models/StoreAttendant';
@@ -72,9 +72,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const createDefaultStore = async (merchantId: string): Promise<Store> => {
+    const db = getDatabase();
     let store: Store;
-    await database.write(async () => {
-      store = await database.get<Store>('stores').create(s => {
+    await db.write(async () => {
+      store = await db.get<Store>('stores').create(s => {
         s.merchantId = merchantId;
         s.name = 'Default Shop';
       });
@@ -83,7 +84,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const loadAllStoresForOwner = async (merchantId: string) => {
-    const allStores = await database.get<Store>('stores').query().fetch();
+    const db = getDatabase();
+    const allStores = await db.get<Store>('stores').query().fetch();
     const ownerStores = allStores.filter(s => s.merchantId === merchantId);
     
     if (ownerStores.length === 0) {
@@ -97,8 +99,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const loadAuthorizedStoresForAttendant = async (attendantId: string) => {
+    const db = getDatabase();
     // Get all store_attendant relationships for this attendant
-    const storeAttendants = await database
+    const storeAttendants = await db
       .get<StoreAttendant>('store_attendants')
       .query()
       .fetch();
@@ -108,7 +111,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       .map(sa => sa.storeId);
 
     // Get all stores
-    const allStores = await database.get<Store>('stores').query().fetch();
+    const allStores = await db.get<Store>('stores').query().fetch();
     const authorized = allStores.filter(s => storeIds.includes(s.id));
     setAuthorizedStores(authorized);
   };

@@ -77,12 +77,12 @@ export default function WhatsAppScreen() {
     // Find recent credit activity
     const recentActivity = activitiesList[0];
     if (recentActivity) {
-      if (recentActivity.activity_type === 'sale' && recentActivity.amount) {
+      if (recentActivity.type === 'sale' && recentActivity.total_amount) {
         dynamicMessages.push({
           id: uuid(),
           sender_role: 'ai_manager',
           message_type: 'text',
-          text: `Sales Alert: A sale of ${recentActivity.amount ? new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(recentActivity.amount) : 'an amount'} was just logged.`,
+          text: `Sales Alert: A sale of ${recentActivity.total_amount ? new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(recentActivity.total_amount) : 'an amount'} was just logged.`,
           timestamp: new Date(Date.now() - 60000).toISOString(),
           sender_name: 'shopX Business Agent',
         });

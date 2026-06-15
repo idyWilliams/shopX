@@ -17,13 +17,19 @@
       "@/*": [
         "./src/*"
       ]
-    }
+    },
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": false
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     "src/types/**/*.d.ts",
     "nativewind-env.d.ts"
+  ],
+  "exclude": [
+    "supabase/functions/**/*"
   ],
   "extends": "expo/tsconfig.base"
 }

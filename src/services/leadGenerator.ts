@@ -1,5 +1,5 @@
 import FirecrawlApp from '@mendable/firecrawl-js';
-import { database } from '../db';
+import { getDatabase } from '../db';
 import { Lead } from '../db/models/Lead';
 import { validateApiKeys } from '../lib/config';
 
@@ -24,7 +24,7 @@ export const generateLeads = async (
         formats: ['markdown'],
       });
 
-      if (response.success && response.markdown) {
+      if (response.markdown) {
         const contactMatches = response.markdown.match(/(?:phone|tel|email|whatsapp):?\s*([^\s\n]+)/gi);
         if (contactMatches) {
           const contact = contactMatches[0].split(':')[1].trim();
@@ -44,9 +44,10 @@ export const generateLeads = async (
 };
 
 export const saveLeadsToDb = async (leads: LeadData[]): Promise<void> => {
-  await database.write(async () => {
+  const db = getDatabase();
+  await db.write(async () => {
     for (const leadData of leads) {
-      await database.get<Lead>('leads').create(lead => {
+      await db.get<Lead>('leads').create(lead => {
         lead.merchantId = leadData.merchantId;
         lead.productInterest = leadData.productInterest;
         lead.contactInfo = leadData.contactInfo;

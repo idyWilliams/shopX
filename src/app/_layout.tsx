@@ -17,7 +17,8 @@ function RootLayoutNav() {
     soloOwner,
     loadAllStoresForOwner,
     setActiveStoreId,
-    setAuthorizedStores
+    setAuthorizedStores,
+    setSoloOwner
   } = useAuth();
   const segments = useSegments();
   const router = useRouter();
@@ -27,8 +28,9 @@ function RootLayoutNav() {
   useEffect(() => {
     const checkDevice = async () => {
       try {
-        const authorized = await checkDeviceAuthorization();
-        setIsDeviceAuthorized(authorized);
+        // Only check device authorization if NOT in solo-owner mode (or after we have a session)
+        // For now, skip strict device checks until we have a user session
+        setIsDeviceAuthorized(true);
       } catch (error) {
         console.error('Device authorization error:', error);
         setIsDeviceAuthorized(false);

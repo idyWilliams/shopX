@@ -42,6 +42,7 @@ export default function AuthScreen() {
           options: { shouldCreateUser: true }
         });
         if (supaError) throw supaError;
+        console.log(`[OTP] Email OTP sent to: ${email}`);
       } else {
         if (phone.length < 7) throw new Error('Please enter a valid phone number.');
         const fullPhone = `+${callingCode}${phone}`;
@@ -55,8 +56,22 @@ export default function AuthScreen() {
           body: JSON.stringify({ phone: fullPhone }),
         });
         
-        const data = await response.json();
-        if (!response.ok || data.error) throw new Error(data.error || 'Failed to send WhatsApp code.');
+        if (!response.ok) {
+          // Always use the user-friendly message, no matter what the Edge Function returns
+          const errorMsg = 'Service temporarily unavailable. Please check your admin configuration.';
+          try {
+            const data = await response.json();
+            // Log detailed error info ONLY to the console, never to the user
+            console.error('[WhatsApp OTP Error]', {
+              status: response.status,
+              statusText: response.statusText,
+              errorData: data
+            });
+          } catch (parseErr) {
+            console.error('[WhatsApp OTP Error] Failed to parse error response:', parseErr);
+          }
+          throw new Error(errorMsg);
+        }
       }
 
       setStep('verify');
@@ -91,8 +106,17 @@ export default function AuthScreen() {
           body: JSON.stringify({ phone: fullPhone, otp: enteredOtp }),
         });
         
+        if (!verifyRes.ok) {
+          let errorMsg = 'Invalid OTP.';
+          try {
+            const verifyData = await verifyRes.json();
+            console.error('WhatsApp OTP Verify Error:', verifyData);
+          } catch (parseErr) {
+            console.error('Failed to parse verify error:', parseErr);
+          }
+          throw new Error(errorMsg);
+        }
         const verifyData = await verifyRes.json();
-        if (!verifyRes.ok || verifyData.error) throw new Error(verifyData.error || 'Invalid OTP.');
 
         const { error: authError } = await supabase.auth.verifyOtp({
           token_hash: verifyData.token_hash,

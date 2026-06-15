@@ -38,6 +38,7 @@ export interface Product {
   cost_price: number;
   selling_price: number;
   created_at: string;
+  stock_quantity?: number;
 }
 
 export interface Inventory {

@@ -25,7 +25,7 @@ export default function SelectShopScreen() {
             style={styles.storeCard}
             onPress={() => handleSelectStore(store.id)}
           >
-            <Feather name="store" size={24} color="#0ea5e9" />
+            <Feather name="shopping-bag" size={24} color="#0ea5e9" />
             <View style={styles.storeInfo}>
               <Text style={styles.storeName}>{store.name}</Text>
               {store.locationAddress && (

@@ -54,12 +54,12 @@ export default function FeedScreen() {
       .filter(a => {
         const timestamp = new Date(a.timestamp);
         return (
-          a.activity_type === 'sale' &&
+          a.type === 'sale' &&
           timestamp >= todayStart &&
           timestamp <= todayEnd
         );
       })
-      .reduce((sum, a) => sum + (a.amount || 0), 0);
+      .reduce((sum, a) => sum + (a.total_amount || 0), 0);
   }, [activities]);
 
   // Calculate active stock

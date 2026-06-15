@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { database } from '../db';
+import { getDatabase } from '../db';
 import { OperationalAnomaly } from '../db/models/OperationalAnomaly';
 import { Attendant } from '../db/models/Attendant';
 import { StoreAttendant } from '../db/models/StoreAttendant';
@@ -22,8 +22,9 @@ const AttendantPinLock: React.FC<Props> = ({ onUnlock, storeId }) => {
   // Load authorized attendants for store
   useEffect(() => {
     const loadAttendants = async () => {
+      const db = getDatabase();
       // First get all store_attendant relationships for this store
-      const storeAttendants = await database
+      const storeAttendants = await db
         .get<StoreAttendant>('store_attendants')
         .query()
         .fetch();
@@ -33,7 +34,7 @@ const AttendantPinLock: React.FC<Props> = ({ onUnlock, storeId }) => {
         .map(sa => sa.attendantId);
 
       // Then load those attendants
-      const allAttendants = await database
+      const allAttendants = await db
         .get<Attendant>('attendants')
         .query()
         .fetch();
@@ -47,8 +48,9 @@ const AttendantPinLock: React.FC<Props> = ({ onUnlock, storeId }) => {
   }, [storeId]);
 
   const logAnomaly = async () => {
-    await database.write(async () => {
-      await database.get<OperationalAnomaly>('operational_anomalies').create((anomaly) => {
+    const db = getDatabase();
+    await db.write(async () => {
+      await db.get<OperationalAnomaly>('operational_anomalies').create((anomaly) => {
         anomaly.anomalyType = 'INVALID_PIN_ATTEMPTS';
         anomaly.severity = 'critical';
         anomaly.storeId = storeId;
