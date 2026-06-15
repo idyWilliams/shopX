@@ -9,7 +9,7 @@ export const validateApiKeys = () => {
   if (missing.length > 0) {
     const errorMsg = `Missing required API keys: ${missing.map(k => k.name).join(', ')}`;
     console.error(errorMsg);
-    throw new Error(errorMsg);
+    // Don't throw, just log, to allow app to start
   }
 
   return {
@@ -19,4 +19,8 @@ export const validateApiKeys = () => {
 };
 
 // Run validation immediately on import
-validateApiKeys();
+try {
+  validateApiKeys();
+} catch (error) {
+  console.error('API key validation failed:', error);
+}

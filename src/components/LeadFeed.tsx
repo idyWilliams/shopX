@@ -10,15 +10,16 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useLeads } from '../db/hooks';
 import { contactLeadOnWhatsApp } from '../lib/whatsappReporter';
-import { database } from '../db';
+import { getDatabase } from '../db';
 import { Lead } from '../db/models/Lead';
 
 const LeadFeed = () => {
-  const [leads] = useLeads();
+  const leads = useLeads();
 
   const updateLeadStatus = async (leadId: string, newStatus: string) => {
-    await database.write(async () => {
-      const lead = await database.get<Lead>('leads').find(leadId);
+    const db = getDatabase();
+    await db.write(async () => {
+      const lead = await db.get<Lead>('leads').find(leadId);
       await lead.update((l) => {
         l.status = newStatus;
       });

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAnomalies, useSalesEvents } from '../db/hooks';
-import { database } from '../db';
+import { getDatabase } from '../db';
 import { SalesEvent } from '../db/models/SalesEvent';
 import { CashDrawerLog } from '../db/models/CashDrawerLog';
 import { generateShopReport } from '../lib/whatsappReporter';
@@ -20,7 +20,7 @@ export const useAnomalyDetection = () => {
 
       // 1. Check for excessive VOID events
       const todaysVoids = salesEvents.filter(
-        (event) =>
+        (event: SalesEvent) =>
           event.eventType === 'VOID' &&
           event.createdAt >= startOfDay
       );
@@ -41,8 +41,9 @@ export const useAnomalyDetection = () => {
         }
       }
 
+      const db = getDatabase();
       // 2. Check cash drawer discrepancies
-      const todaysCashLogs = await database
+      const todaysCashLogs = await db
         .get<CashDrawerLog>('cash_drawer_logs')
         .query()
         .fetch();

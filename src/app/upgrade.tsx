@@ -43,7 +43,7 @@ export default function UpgradeScreen() {
       if (result.success) {
           Alert.alert(
             'Pro Activated!',
-            `Welcome to shopX Pro! Transaction ID: ${result.transactionId}`,
+            `Welcome to shopX Pro!`,
             [{ text: 'Let\'s Go!', onPress: () => router.back() }]
           );
       } else {

@@ -13,23 +13,36 @@ import { DeviceRegistry } from './models/DeviceRegistry';
 import { OperationalAnomaly } from './models/OperationalAnomaly';
 import { Lead } from './models/Lead';
 
-const adapter = new SQLiteAdapter({
-  schema: mySchema,
-  jsi: false,
-});
+let _database: Database | null = null;
 
-export const database = new Database({
-  adapter,
-  modelClasses: [
-    Merchant,
-    Store,
-    Attendant,
-    StoreAttendant,
-    Product,
-    SalesEvent,
-    CashDrawerLog,
-    DeviceRegistry,
-    OperationalAnomaly,
-    Lead,
-  ],
+export const getDatabase = (): Database => {
+  if (!_database) {
+    const adapter = new SQLiteAdapter({
+      schema: mySchema,
+      jsi: false,
+    });
+    _database = new Database({
+      adapter,
+      modelClasses: [
+        Merchant,
+        Store,
+        Attendant,
+        StoreAttendant,
+        Product,
+        SalesEvent,
+        CashDrawerLog,
+        DeviceRegistry,
+        OperationalAnomaly,
+        Lead,
+      ],
+    });
+  }
+  return _database;
+};
+
+// Keep a named export for backward compatibility
+export const database = new Proxy({} as Database, {
+  get: (_target, prop) => {
+    return getDatabase()[prop as keyof Database];
+  },
 });

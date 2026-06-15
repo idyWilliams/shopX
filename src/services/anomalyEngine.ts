@@ -1,4 +1,4 @@
-import { database } from '../db';
+import { getDatabase } from '../db';
 import { SalesEvent } from '../db/models/SalesEvent';
 import { OperationalAnomaly } from '../db/models/OperationalAnomaly';
 import { CashDrawerLog } from '../db/models/CashDrawerLog';
@@ -21,21 +21,22 @@ export const getDailyAnomalyReport = async (
 ): Promise<DailyAnomalyReport> => {
   const startOfDay = new Date(date.setHours(0, 0, 0, 0));
   const endOfDay = new Date(date.setHours(23, 59, 59, 999));
+  const db = getDatabase();
 
   // Get all operational anomalies for today
-  const allAnomalies = await database
+  const allAnomalies = await db
     .get<OperationalAnomaly>('operational_anomalies')
     .query()
     .fetch();
 
   // Get all sales events for today
-  const allSalesEvents = await database
+  const allSalesEvents = await db
     .get<SalesEvent>('sales_events')
     .query()
     .fetch();
 
   // Get all cash drawer logs for today
-  const cashDrawerLogs = await database
+  const cashDrawerLogs = await db
     .get<CashDrawerLog>('cash_drawer_logs')
     .query()
     .fetch();

@@ -3,34 +3,36 @@
  * Tests the operational_anomalies system against 3 malicious scenarios
  */
 
-import { database } from '../db';
+import { getDatabase } from '../db';
 import { OperationalAnomaly } from '../db/models/OperationalAnomaly';
 import { StoreAttendant } from '../db/models/StoreAttendant';
 import { checkDeviceAuthorization, getCurrentFingerprint, registerDevice } from '../lib/deviceGuard';
 
 // Mock the database operations for testing
-jest.mock('../db', () => ({
-  database: {
-    write: jest.fn().mockImplementation(async (fn: any) => {
-      await fn({
-        get: jest.fn().mockReturnValue({
-          create: jest.fn().mockImplementation(fn => {
-            const record = {};
-            fn(record);
-            return record;
-          }),
-          query: jest.fn().mockReturnValue({
-            fetch: jest.fn().mockResolvedValue([])
-          })
+const mockDb = {
+  write: jest.fn().mockImplementation(async (fn: any) => {
+    await fn({
+      get: jest.fn().mockReturnValue({
+        create: jest.fn().mockImplementation(fn => {
+          const record = {};
+          fn(record);
+          return record;
+        }),
+        query: jest.fn().mockReturnValue({
+          fetch: jest.fn().mockResolvedValue([])
         })
-      });
-    }),
-    get: jest.fn().mockReturnValue({
-      query: jest.fn().mockReturnValue({
-        fetch: jest.fn().mockResolvedValue([])
       })
+    });
+  }),
+  get: jest.fn().mockReturnValue({
+    query: jest.fn().mockReturnValue({
+      fetch: jest.fn().mockResolvedValue([])
     })
-  }
+  })
+};
+
+jest.mock('../db', () => ({
+  getDatabase: jest.fn().mockReturnValue(mockDb)
 }));
 
 // Mock expo-constants
@@ -54,8 +56,9 @@ describe('Security Stress Tests', () => {
 
       // Create a mock function that simulates what AttendantPinLock does
       const logAnomaly = async (storeId: string) => {
-        await database.write(async () => {
-          await database.get<OperationalAnomaly>('operational_anomalies').create((anomaly) => {
+        const db = getDatabase();
+        await db.write(async () => {
+          await db.get<OperationalAnomaly>('operational_anomalies').create((anomaly) => {
             anomaly.anomalyType = 'INVALID_PIN_ATTEMPTS';
             anomaly.severity = 'critical';
             anomaly.storeId = storeId;
@@ -121,8 +124,9 @@ describe('Security Stress Tests', () => {
         const productExists = false;
 
         if (!productExists) {
-          await database.write(async () => {
-            await database.get<OperationalAnomaly>('operational_anomalies').create((anomaly) => {
+          const db = getDatabase();
+          await db.write(async () => {
+            await db.get<OperationalAnomaly>('operational_anomalies').create((anomaly) => {
               anomaly.anomalyType = 'DATA_INTEGRITY_VIOLATION';
               anomaly.severity = 'medium';
               anomaly.storeId = storeId;

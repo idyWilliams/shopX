@@ -9,18 +9,19 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { supabase } from '../lib/supabase';
-import { database } from '../db';
+import { getDatabase } from '../db';
 import { SalesEvent } from '../db/models/SalesEvent';
 import { OperationalAnomaly } from '../db/models/OperationalAnomaly';
 import { Product } from '../db/models/Product';
 import { useAuth } from '../context/AuthContext';
 
 const logDataIntegrityAnomaly = async (command: string, details: any, storeId: string | null) => {
-  await database.write(async () => {
-    await database.get<OperationalAnomaly>('operational_anomalies').create((anomaly) => {
+  const db = getDatabase();
+  await db.write(async () => {
+    await db.get<OperationalAnomaly>('operational_anomalies').create((anomaly) => {
       anomaly.anomalyType = 'DATA_INTEGRITY_VIOLATION';
       anomaly.severity = 'medium';
-      anomaly.storeId = storeId;
+      anomaly.storeId = storeId || undefined;
       anomaly.payload = JSON.stringify({ command, details, timestamp: new Date().toISOString() });
       anomaly.createdAt = new Date();
     });
@@ -75,8 +76,9 @@ const VoiceLedger: React.FC = () => {
 
       if (error) throw error;
 
+      const db = getDatabase();
       // Validate data integrity: check for valid SKU or product
-      const products = await database.get<Product>('products').query().fetch();
+      const products = await db.get<Product>('products').query().fetch();
       const productExists = products.some(p => 
         p.name.toLowerCase().includes(data.productName?.toLowerCase() || '')
       );
@@ -104,13 +106,14 @@ const VoiceLedger: React.FC = () => {
     setIsProcessing(true);
 
     try {
-      await database.write(async () => {
-        await database.get<SalesEvent>('sales_events').create((event) => {
-          event.storeId = activeStoreId;
+      const db = getDatabase();
+      await db.write(async () => {
+        await db.get<SalesEvent>('sales_events').create((event) => {
+          event.storeId = activeStoreId || undefined;
           event.eventType = confirmed.action;
           event.quantity = confirmed.quantity;
           event.priceAtSale = confirmed.price || 0;
-          event.attendantId = currentAttendant?.id;
+          event.attendantId = currentAttendant?.id || '';
           event.createdAt = new Date();
         });
       });

@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useAnomalies, useSalesEvents } from '../db/hooks';
+import { useAnomalies } from '../db/hooks';
 import { getDailyAnomalyReport } from '../services/anomalyEngine';
 import { generateShiftSummary } from '../lib/whatsapp';
-import { database } from '../db';
 import { OperationalAnomaly } from '../db/models/OperationalAnomaly';
 
 const OwnerDashboard: React.FC = () => {
@@ -32,9 +31,9 @@ const OwnerDashboard: React.FC = () => {
     const summary = generateShiftSummary(report, anomalies);
     
     // Check if Share API is available
-    if (typeof navigator !== 'undefined' && navigator.share) {
+    if (typeof navigator !== 'undefined' && (navigator as any).share) {
       try {
-        await navigator.share({
+        await (navigator as any).share({
           title: 'ShopX Shift Report',
           text: summary,
         });
