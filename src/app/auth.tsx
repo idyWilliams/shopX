@@ -36,12 +36,32 @@ export default function AuthScreen() {
 
     try {
       if (mode === 'email') {
-        if (!email.includes('@')) throw new Error('Please enter a valid email address.');
-        const { error: supaError } = await supabase.auth.signInWithOtp({
-          email,
-          options: { shouldCreateUser: true }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) throw new Error('Please enter a valid email address.');
+        
+        const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/send-email-otp`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email }),
         });
-        if (supaError) throw supaError;
+        
+        if (!response.ok) {
+          const errorMsg = 'Service temporarily unavailable. Please check your admin configuration.';
+          try {
+            const data = await response.json();
+            console.error('[Email OTP Error]', {
+              status: response.status,
+              statusText: response.statusText,
+              errorData: data
+            });
+          } catch (parseErr) {
+            console.error('[Email OTP Error] Failed to parse error response:', parseErr);
+          }
+          throw new Error(errorMsg);
+        }
         console.log(`[OTP] Email OTP sent to: ${email}`);
       } else {
         if (phone.length < 7) throw new Error('Please enter a valid phone number.');
@@ -57,11 +77,9 @@ export default function AuthScreen() {
         });
         
         if (!response.ok) {
-          // Always use the user-friendly message, no matter what the Edge Function returns
           const errorMsg = 'Service temporarily unavailable. Please check your admin configuration.';
           try {
             const data = await response.json();
-            // Log detailed error info ONLY to the console, never to the user
             console.error('[WhatsApp OTP Error]', {
               status: response.status,
               statusText: response.statusText,
@@ -89,12 +107,33 @@ export default function AuthScreen() {
 
     try {
       if (mode === 'email') {
-        const { error: supaError } = await supabase.auth.verifyOtp({
-          email,
-          token: enteredOtp,
+        const verifyRes = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/verify-email-otp`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, otp: enteredOtp }),
+        });
+        
+        if (!verifyRes.ok) {
+          let errorMsg = 'Invalid OTP.';
+          try {
+            const verifyData = await verifyRes.json();
+            if (verifyData.error) errorMsg = verifyData.error;
+            console.error('Email OTP Verify Error:', verifyData);
+          } catch (parseErr) {
+            console.error('Failed to parse verify error:', parseErr);
+          }
+          throw new Error(errorMsg);
+        }
+        const verifyData = await verifyRes.json();
+
+        const { error: authError } = await supabase.auth.verifyOtp({
+          token_hash: verifyData.token_hash,
           type: 'email'
         });
-        if (supaError) throw supaError;
+        if (authError) throw authError;
       } else {
         const fullPhone = `+${callingCode}${phone}`;
         const verifyRes = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/verify-whatsapp-otp`, {
@@ -110,6 +149,7 @@ export default function AuthScreen() {
           let errorMsg = 'Invalid OTP.';
           try {
             const verifyData = await verifyRes.json();
+            if (verifyData.error) errorMsg = verifyData.error;
             console.error('WhatsApp OTP Verify Error:', verifyData);
           } catch (parseErr) {
             console.error('Failed to parse verify error:', parseErr);
@@ -158,7 +198,7 @@ export default function AuthScreen() {
       className="flex-1 bg-zinc-950 px-6 justify-center"
     >
       <View className="items-center mb-10">
-        <Text className="text-white text-4xl font-extrabold tracking-widest">ShopX</Text>
+        <Text className="text-[#0EA5E9] text-4xl font-extrabold tracking-widest">ShopX</Text>
         <Text className="text-zinc-400 mt-2 text-base">Secure Business Access</Text>
       </View>
 
@@ -217,7 +257,7 @@ export default function AuthScreen() {
           {error ? <Text className="text-red-500 text-sm mb-4">{error}</Text> : null}
 
           <TouchableOpacity
-            className="bg-blue-600 rounded-lg h-14 items-center justify-center mt-4"
+            className="bg-[#0EA5E9] rounded-lg h-14 items-center justify-center mt-4"
             disabled={loading}
             onPress={handleSendCode}
           >
@@ -227,7 +267,7 @@ export default function AuthScreen() {
       ) : (
         <View className="w-full items-center">
           <Text className="text-zinc-400 text-center mb-6 text-base">
-            Enter the 6-digit code sent to {mode === 'whatsapp' ? `+${callingCode}${phone}` : email}
+            We sent a code to {mode === 'whatsapp' ? `+${callingCode}${phone}` : email}
           </Text>
 
           <View className="flex-row justify-between w-full mb-4">
@@ -235,7 +275,7 @@ export default function AuthScreen() {
               <TextInput
                 key={index}
                 ref={(el) => { if (el) otpRefs.current[index] = el; }}
-                className="w-12 h-14 bg-zinc-900 border border-zinc-800 rounded-lg text-white text-2xl text-center focus:border-blue-500"
+                className="w-12 h-14 bg-zinc-900 border border-zinc-800 rounded-lg text-white text-2xl text-center focus:border-[#0EA5E9]"
                 maxLength={1}
                 keyboardType="numeric"
                 value={digit}
@@ -257,7 +297,7 @@ export default function AuthScreen() {
               <Text className="text-zinc-600">Resend in {resendTimer}s</Text>
             ) : (
               <TouchableOpacity onPress={handleSendCode} disabled={loading}>
-                <Text className="text-blue-500 font-bold">Resend Code</Text>
+                <Text className="text-[#0EA5E9] font-bold">Resend Code</Text>
               </TouchableOpacity>
             )}
           </View>
