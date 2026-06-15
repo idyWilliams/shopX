@@ -12,11 +12,17 @@ import { router } from 'expo-router';
 
 const Onboarding = () => {
   const [currentStep, setCurrentStep] = useState(1);
-  const { setActiveStoreId, setAuthorizedStores } = useAuth();
+  const { 
+    setActiveStoreId, 
+    setAuthorizedStores, 
+    setSoloOwner,
+    createDefaultStore
+  } = useAuth();
 
   // Step 1: Store Setup
   const [merchantEmail, setMerchantEmail] = useState('');
   const [merchantPhone, setMerchantPhone] = useState('');
+  const [isSoloOwner, setIsSoloOwner] = useState(false);
   const [stores, setStores] = useState<{ name: string; location: string }[]>([
     { name: '', location: '' },
   ]);
@@ -78,26 +84,66 @@ const Onboarding = () => {
       Alert.alert('Error', 'Please enter merchant email');
       return;
     }
-    const validStores = stores.filter(s => s.name.trim());
-    if (validStores.length === 0) {
-      Alert.alert('Error', 'Please add at least one store');
-      return;
+    
+    if (isSoloOwner) {
+      // Skip steps 2 and 3 for solo owner
+      completeSoloOwnerOnboarding();
+    } else {
+      const validStores = stores.filter(s => s.name.trim());
+      if (validStores.length === 0) {
+        Alert.alert('Error', 'Please add at least one store');
+        return;
+      }
+      setCurrentStep(2);
     }
-    setCurrentStep(2);
   };
 
   const completeStep2 = () => {
-    // Check at least one attendant has been added
-    const validAttendants = attendants.filter(a => a.name && a.pin);
-    if (validAttendants.length === 0) {
-      Alert.alert('Error', 'Please add at least one attendant');
-      return;
+    // Check at least one attendant has been added if not solo owner
+    if (!isSoloOwner) {
+      const validAttendants = attendants.filter(a => a.name && a.pin);
+      if (validAttendants.length === 0) {
+        Alert.alert('Error', 'Please add at least one attendant');
+        return;
+      }
     }
     setCurrentStep(3);
   };
 
+  const completeSoloOwnerOnboarding = async () => {
+    try {
+      let createdMerchantId = '';
+
+      // 1. Create Merchant
+      await database.write(async () => {
+        const merchant = await database.get<Merchant>('merchants').create(m => {
+          m.email = merchantEmail;
+          m.phone = merchantPhone;
+        });
+        createdMerchantId = merchant.id;
+      });
+
+      // 2. Create Default Store
+      const defaultStore = await createDefaultStore(createdMerchantId);
+
+      // 3. Register Device for default store
+      await registerDevice(defaultStore.id);
+
+      // 4. Update auth context
+      setSoloOwner(true);
+      setActiveStoreId?.(defaultStore.id);
+      setAuthorizedStores?.([defaultStore]);
+
+      Alert.alert('Success', 'Onboarding complete!');
+      router.replace('/(tabs)');
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to complete onboarding');
+    }
+  };
+
   const completeOnboarding = async () => {
-    if (!selectedStoreForDevice) {
+    if (!isSoloOwner && !selectedStoreForDevice) {
       Alert.alert('Error', 'Please select a store for this device');
       return;
     }
@@ -128,37 +174,42 @@ const Onboarding = () => {
       }
 
       // 3. Create Attendants and Store Attendant relationships
-      for (const attendant of attendants.filter(a => a.name && a.pin)) {
-        let createdAttendantId = '';
-        await database.write(async () => {
-          const newAttendant = await database
-            .get<Attendant>('attendants')
-            .create(a => {
-              a.name = attendant.name;
-              a.hashedPin = attendant.pin;
-              a.accessLevel = attendant.accessLevel;
-            });
-          createdAttendantId = newAttendant.id;
-        });
-
-        // Create store_attendant relationships
-        for (const storeName of attendant.assignedStores) {
-          if (createdStoreIds[storeName]) {
-            await database.write(async () => {
-              await database.get<StoreAttendant>('store_attendants').create(sa => {
-                sa.storeId = createdStoreIds[storeName];
-                sa.attendantId = createdAttendantId;
+      if (!isSoloOwner) {
+        for (const attendant of attendants.filter(a => a.name && a.pin)) {
+          let createdAttendantId = '';
+          await database.write(async () => {
+            const newAttendant = await database
+              .get<Attendant>('attendants')
+              .create(a => {
+                a.name = attendant.name;
+                a.hashedPin = attendant.pin;
+                a.accessLevel = attendant.accessLevel;
               });
-            });
+            createdAttendantId = newAttendant.id;
+          });
+
+          // Create store_attendant relationships
+          for (const storeName of attendant.assignedStores) {
+            if (createdStoreIds[storeName]) {
+              await database.write(async () => {
+                await database.get<StoreAttendant>('store_attendants').create(sa => {
+                  sa.storeId = createdStoreIds[storeName];
+                  sa.attendantId = createdAttendantId;
+                });
+              });
+            }
           }
         }
       }
 
-      // 4. Register Device for selected store
-      const targetStoreId = createdStoreIds[selectedStoreForDevice];
+      // 4. Register Device
+      const targetStoreId = isSoloOwner 
+        ? (await createDefaultStore(createdMerchantId)).id 
+        : createdStoreIds[selectedStoreForDevice];
       await registerDevice(targetStoreId);
 
       // 5. Update auth context
+      setSoloOwner(isSoloOwner);
       setActiveStoreId?.(targetStoreId);
       // Load all stores into authorizedStores
       const loadedStores = await database.get<Store>('stores').query().fetch();
@@ -204,36 +255,53 @@ const Onboarding = () => {
         />
       </View>
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.label}>Your Stores</Text>
-        <TouchableOpacity onPress={addStore} style={styles.addButton}>
-          <Feather name="plus" size={20} color="#0EA5E9" />
-          <Text style={styles.addButtonText}>Add Store</Text>
-        </TouchableOpacity>
-      </View>
-
-      {stores.map((store, index) => (
-        <View key={index} style={styles.storeCard}>
-          <Text style={styles.cardTitle}>Store {index + 1}</Text>
-          <TextInput
-            style={styles.input}
-            value={store.name}
-            onChangeText={v => updateStore(index, 'name', v)}
-            placeholder="Store Name"
-            placeholderTextColor="#71717A"
-          />
-          <TextInput
-            style={styles.input}
-            value={store.location}
-            onChangeText={v => updateStore(index, 'location', v)}
-            placeholder="Location (optional)"
-            placeholderTextColor="#71717A"
-          />
+      <TouchableOpacity
+        style={styles.checkboxContainer}
+        onPress={() => setIsSoloOwner(!isSoloOwner)}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.checkbox, isSoloOwner && styles.checkboxActive]}>
+          {isSoloOwner && <Feather name="check" size={18} color="white" />}
         </View>
-      ))}
+        <Text style={styles.checkboxLabel}>I manage this shop alone</Text>
+      </TouchableOpacity>
+
+      {!isSoloOwner && (
+        <>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.label}>Your Stores</Text>
+            <TouchableOpacity onPress={addStore} style={styles.addButton}>
+              <Feather name="plus" size={20} color="#0EA5E9" />
+              <Text style={styles.addButtonText}>Add Store</Text>
+            </TouchableOpacity>
+          </View>
+
+          {stores.map((store, index) => (
+            <View key={index} style={styles.storeCard}>
+              <Text style={styles.cardTitle}>Store {index + 1}</Text>
+              <TextInput
+                style={styles.input}
+                value={store.name}
+                onChangeText={v => updateStore(index, 'name', v)}
+                placeholder="Store Name"
+                placeholderTextColor="#71717A"
+              />
+              <TextInput
+                style={styles.input}
+                value={store.location}
+                onChangeText={v => updateStore(index, 'location', v)}
+                placeholder="Location (optional)"
+                placeholderTextColor="#71717A"
+              />
+            </View>
+          ))}
+        </>
+      )}
 
       <TouchableOpacity style={styles.button} onPress={completeStep1}>
-        <Text style={styles.buttonText}>Next: Staff Assignment</Text>
+        <Text style={styles.buttonText}>
+          {isSoloOwner ? "Complete Setup" : "Next: Staff Assignment"}
+        </Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -452,6 +520,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     color: '#FAFAFA',
+    fontSize: 16,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#3f3f46',
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxActive: {
+    backgroundColor: '#0EA5E9',
+    borderColor: '#0EA5E9',
+  },
+  checkboxLabel: {
+    color: '#E4E4E7',
     fontSize: 16,
   },
   sectionHeader: {

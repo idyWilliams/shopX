@@ -3,6 +3,7 @@ import { Feather } from '@expo/vector-icons';
 import React, { useState, useCallback } from 'react';
 import { AppState } from 'react-native';
 import AttendantPinLock from '../../components/AttendantPinLock';
+import { useAuth } from '../../context/AuthContext';
 
 const iconMap = {
   index: 'home',
@@ -15,6 +16,7 @@ const iconMap = {
 
 export default function TabLayout() {
   const [isLocked, setIsLocked] = useState<boolean>(true);
+  const { soloOwner, activeStoreId } = useAuth();
 
   const handleUnlock = useCallback(() => {
     setIsLocked(false);
@@ -32,8 +34,8 @@ export default function TabLayout() {
     };
   }, []);
 
-  if (isLocked) {
-    return <AttendantPinLock onUnlock={handleUnlock} />;
+  if (isLocked && !soloOwner) {
+    return <AttendantPinLock onUnlock={handleUnlock} storeId={activeStoreId!} />;
   }
 
   return (

@@ -8,7 +8,17 @@ import '../lib/config'; // Validate API keys on app start
 import TerminalUnauthorizedScreen from '../components/TerminalUnauthorizedScreen';
 
 function RootLayoutNav() {
-  const { session, loading, activeStoreId, authorizedStores, currentAttendant } = useAuth();
+  const { 
+    session, 
+    loading, 
+    activeStoreId, 
+    authorizedStores, 
+    currentAttendant, 
+    soloOwner,
+    loadAllStoresForOwner,
+    setActiveStoreId,
+    setAuthorizedStores
+  } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   const [deviceChecked, setDeviceChecked] = useState<boolean>(false);
@@ -40,21 +50,32 @@ function RootLayoutNav() {
     if (!session && !inAuthGroup && !inOnboarding) {
       router.replace('/auth');
     } else if (session) {
+      // For solo owner, always load owner's stores first
+      if (soloOwner && authorizedStores.length === 0) {
+        // Load all stores for owner (which creates default if none)
+        loadAllStoresForOwner(session.user.id);
+      }
+
       if (inAuthGroup) {
-        // Check if we need to select a shop or go to tabs
-        if (!activeStoreId && authorizedStores.length > 1) {
-          router.replace('/select-shop');
-        } else if (!activeStoreId && authorizedStores.length === 1) {
-          // Auto-select the only store
+        if (soloOwner) {
+          // Bypass select shop and PIN for solo owner
           router.replace('/(tabs)');
-        } else if (activeStoreId) {
-          router.replace('/(tabs)');
+        } else {
+          // Check if we need to select a shop or go to tabs
+          if (!activeStoreId && authorizedStores.length > 1) {
+            router.replace('/select-shop');
+          } else if (!activeStoreId && authorizedStores.length === 1) {
+            // Auto-select the only store
+            router.replace('/(tabs)');
+          } else if (activeStoreId) {
+            router.replace('/(tabs)');
+          }
         }
-      } else if (!inSelectShopGroup && !inOnboarding && !activeStoreId && authorizedStores.length > 1) {
+      } else if (!inSelectShopGroup && !inOnboarding && !activeStoreId && authorizedStores.length > 1 && !soloOwner) {
         router.replace('/select-shop');
       }
     }
-  }, [session, loading, segments, deviceChecked, activeStoreId, authorizedStores]);
+  }, [session, loading, segments, deviceChecked, activeStoreId, authorizedStores, soloOwner]);
 
   if (loading || !deviceChecked) {
     return (
