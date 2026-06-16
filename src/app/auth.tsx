@@ -131,7 +131,7 @@ export default function AuthScreen() {
 
         const { error: authError } = await supabase.auth.verifyOtp({
           token_hash: verifyData.token_hash,
-          type: 'email'
+          type: 'magiclink'
         });
         if (authError) throw authError;
       } else {
@@ -160,7 +160,7 @@ export default function AuthScreen() {
 
         const { error: authError } = await supabase.auth.verifyOtp({
           token_hash: verifyData.token_hash,
-          type: 'email'
+          type: 'magiclink'
         });
         if (authError) throw authError;
       }
