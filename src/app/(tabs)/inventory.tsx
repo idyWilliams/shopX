@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, FlatList, Image, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 import type { Product, Location as LocationType, Inventory as InventoryType } from '../../types';
 
@@ -56,6 +57,7 @@ const calculateFX = (amount: number, fromCurrency: string, toCurrency: string, r
 };
 
 export default function InventoryScreen() {
+  const router = useRouter();
   const [activeLocation, setActiveLocation] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
@@ -193,7 +195,10 @@ export default function InventoryScreen() {
     const sellingPriceGBP = calculateFX(product.selling_price, baseCurrency, 'GBP', rates);
 
     return (
-      <View className="mx-4 mb-4 rounded-3xl bg-zinc-900 border border-zinc-800 p-5">
+      <TouchableOpacity
+        className="mx-4 mb-4 rounded-3xl bg-zinc-900 border border-zinc-800 p-5 active:opacity-90"
+        onPress={() => router.push(`/product-detail?id=${product.id}`)}
+      >
         <View className="flex-row gap-4">
           <View className="h-24 w-24 overflow-hidden rounded-2xl bg-zinc-800">
             {product.image_url ? (
@@ -237,7 +242,7 @@ export default function InventoryScreen() {
             </View>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 

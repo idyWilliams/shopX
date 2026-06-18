@@ -68,35 +68,45 @@ serve(async (req) => {
     console.log('[verify-email-otp] Marking OTP as used');
     await supabaseAdmin.from('otp_verifications').update({ used: true }).eq('id', record.id);
 
-    console.log('[verify-email-otp] Creating/fetching user');
-    const { error: createUserError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      email_confirm: true,
-      user_metadata: { auth_method: 'email_otp' },
-    });
-
-    if (createUserError) {
-      console.error('[verify-email-otp] Create user error (this is expected if user exists):', createUserError);
-      console.error('[verify-email-otp] Create user error code:', createUserError.code);
-      console.error('[verify-email-otp] Create user error message:', createUserError.message);
+    // Step 1: Get or create user
+    console.log('[verify-email-otp] Checking for existing user');
+    let { data: { user }, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+    
+    if (getUserError || !user) {
+      console.log('[verify-email-otp] Creating new user');
+      const { data, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        email_confirm: true,
+        user_metadata: { auth_method: 'email_otp' },
+      });
       
-      // Check for multiple ways Supabase indicates user already exists
-      const isAlreadyRegistered = 
-        (createUserError.code === 'user_already_exists') ||
-        (createUserError.message?.toLowerCase().includes('already registered')) || 
-        (createUserError.message?.toLowerCase().includes('already exists')) ||
-        (createUserError.message?.toLowerCase().includes('user already exists'));
-      
-      if (!isAlreadyRegistered) {
-        console.error('[verify-email-otp] Not an "already exists" error, throwing...');
-        throw createUserError;
+      if (createUserError) {
+        console.error('[verify-email-otp] Failed to create user:', createUserError);
+        // Check if user already exists
+        const isAlreadyRegistered = 
+          (createUserError.code === 'user_already_exists') ||
+          (createUserError.message?.toLowerCase().includes('already registered')) || 
+          (createUserError.message?.toLowerCase().includes('already exists'));
+        
+        if (isAlreadyRegistered) {
+          // Try to get user again
+          const { data: userData } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+          user = userData.user;
+        } else {
+          throw createUserError;
+        }
+      } else {
+        user = data.user;
       }
-      console.log('[verify-email-otp] User already exists, continuing to generate magic link...');
-    } else {
-      console.log('[verify-email-otp] New user created successfully');
     }
 
-    console.log('[verify-email-otp] Generating magic link');
+    if (!user) {
+      throw new Error('Failed to get or create user');
+    }
+
+    console.log('[verify-email-otp] User found/created:', user.id);
+
+    // Step 2: Generate a magic link (to get a valid token_hash for verifyOtp)
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
       email,
@@ -104,13 +114,11 @@ serve(async (req) => {
     });
 
     if (linkError) {
-      console.error('[verify-email-otp] Generate link error:', linkError);
+      console.error('[verify-email-otp] Failed to generate magic link:', linkError);
       throw linkError;
     }
 
-    console.log('[verify-email-otp] Magic link generated successfully');
     console.log('[verify-email-otp] Function completed successfully');
-
     return new Response(JSON.stringify({
       success: true,
       token_hash: linkData.properties.hashed_token,
@@ -122,7 +130,6 @@ serve(async (req) => {
     console.error('[verify-email-otp] Full error:', error);
     console.error('[verify-email-otp] Error message:', error.message);
     console.error('[verify-email-otp] Error stack:', error.stack);
-    // Never expose internal errors to client
     return new Response(JSON.stringify({ error: 'Service temporarily unavailable. Please check your admin configuration.' }), {
       status: 503,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

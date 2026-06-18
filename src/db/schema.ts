@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 export const mySchema = appSchema({
-  version: 3,
+  version: 4, // Incremented schema version
   tables: [
     tableSchema({
       name: 'merchants',
@@ -43,6 +43,27 @@ export const mySchema = appSchema({
         { name: 'wholesale_price', type: 'number' },
         { name: 'stock_quantity', type: 'number' },
         { name: 'is_active', type: 'boolean' },
+        // New fields for enhanced product info
+        { name: 'description', type: 'string', isOptional: true },
+        { name: 'image_url', type: 'string', isOptional: true },
+        { name: 'category', type: 'string', isOptional: true },
+        { name: 'manufacturer', type: 'string', isOptional: true },
+        { name: 'cost_price', type: 'number', isOptional: true }, // Cost to purchase
+        { name: 'minimum_stock_level', type: 'number', isOptional: true }, // Low stock alert
+      ],
+    }),
+    // New table for price history tracking
+    tableSchema({
+      name: 'price_history',
+      columns: [
+        { name: 'product_id', type: 'string' },
+        { name: 'old_retail_price', type: 'number', isOptional: true },
+        { name: 'new_retail_price', type: 'number' },
+        { name: 'old_wholesale_price', type: 'number', isOptional: true },
+        { name: 'new_wholesale_price', type: 'number', isOptional: true },
+        { name: 'changed_by', type: 'string' }, // User ID of who changed it
+        { name: 'reason', type: 'string', isOptional: true }, // Why the price changed
+        { name: 'created_at', type: 'number' },
       ],
     }),
     tableSchema({
