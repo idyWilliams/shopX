@@ -1,48 +1,15 @@
-import { Database } from '@nozbe/watermelondb';
-import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
 
-import { mySchema } from './schema';
-import { Merchant } from './models/Merchant';
-import { Store } from './models/Store';
-import { Attendant } from './models/Attendant';
-import { StoreAttendant } from './models/StoreAttendant';
-import { Product } from './models/Product';
-import { SalesEvent } from './models/SalesEvent';
-import { CashDrawerLog } from './models/CashDrawerLog';
-import { DeviceRegistry } from './models/DeviceRegistry';
-import { OperationalAnomaly } from './models/OperationalAnomaly';
-import { Lead } from './models/Lead';
+// Temporarily disabled WatermelonDB to fix native module error
+// We'll use Supabase for all data needs right now!
 
-let _database: Database | null = null;
-
-export const getDatabase = (): Database => {
-  if (!_database) {
-    const adapter = new SQLiteAdapter({
-      schema: mySchema,
-      jsi: false,
-    });
-    _database = new Database({
-      adapter,
-      modelClasses: [
-        Merchant,
-        Store,
-        Attendant,
-        StoreAttendant,
-        Product,
-        SalesEvent,
-        CashDrawerLog,
-        DeviceRegistry,
-        OperationalAnomaly,
-        Lead,
-      ],
-    });
-  }
-  return _database;
+export const getDatabase = () => {
+  console.warn('WatermelonDB is temporarily disabled');
+  return null as any;
 };
 
-// Keep a named export for backward compatibility
-export const database = new Proxy({} as Database, {
-  get: (_target, prop) => {
-    return getDatabase()[prop as keyof Database];
+export const database = new Proxy({} as any, {
+  get: () => {
+    console.warn('WatermelonDB is temporarily disabled');
+    return () => {};
   },
 });
