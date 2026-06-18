@@ -24,4 +24,23 @@ export class Product extends Model {
 
   @field('is_active')
   isActive!: boolean;
+
+  // New fields
+  @field('description')
+  description?: string;
+
+  @field('image_url')
+  imageUrl?: string;
+
+  @field('category')
+  category?: string;
+
+  @field('manufacturer')
+  manufacturer?: string;
+
+  @field('cost_price')
+  costPrice?: number;
+
+  @field('minimum_stock_level')
+  minimumStockLevel?: number;
 }

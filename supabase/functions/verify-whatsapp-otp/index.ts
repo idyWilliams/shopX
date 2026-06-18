@@ -59,7 +59,7 @@ serve(async (req) => {
 
     if (record.otp !== otp) {
       console.error('[verify-whatsapp-otp] OTP mismatch');
-      return new Response(JSON.stringify({ error: 'Incorrect code' }), {
+      return new Response(JSON.stringify({ error: 'Incorrect code. Please try again.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -69,56 +69,67 @@ serve(async (req) => {
     await supabaseAdmin.from('otp_verifications').update({ used: true }).eq('id', record.id);
 
     const internalEmail = `${phone.replace('+', '').replace(/\s/g, '')}@shopx-internal.app`;
+    console.log('[verify-whatsapp-otp] Using internal email:', internalEmail);
 
-    console.log('[verify-whatsapp-otp] Creating/fetching user');
-    const { error: createUserError } = await supabaseAdmin.auth.admin.createUser({
-      email: internalEmail,
-      email_confirm: true,
-      phone: phone,
-      phone_confirm: true,
-      user_metadata: { phone, auth_method: 'whatsapp' },
-    });
-
-    if (createUserError) {
-      console.error('[verify-whatsapp-otp] Create user error (this is expected if user exists):', createUserError);
-      console.error('[verify-whatsapp-otp] Create user error code:', createUserError.code);
-      console.error('[verify-whatsapp-otp] Create user error message:', createUserError.message);
-
-      const msg = createUserError.message?.toLowerCase() || '';
-      const code = createUserError.code || '';
-      const isAlreadyRegistered =
-        code === 'user_already_exists' ||
-        msg.includes('already registered') ||
-        msg.includes('already exists');
-
-      if (!isAlreadyRegistered) {
-        console.error('[verify-whatsapp-otp] Not an "already exists" error, throwing...');
-        throw createUserError;
+    // Step 1: Get or create user
+    console.log('[verify-whatsapp-otp] Checking for existing user');
+    let { data: { user }, error: getUserError } = await supabaseAdmin.auth.admin.getUserByEmail(internalEmail);
+    
+    if (getUserError || !user) {
+      console.log('[verify-whatsapp-otp] Creating new user');
+      const { data, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
+        email: internalEmail,
+        email_confirm: true,
+        phone,
+        phone_confirm: true,
+        user_metadata: { phone, auth_method: 'whatsapp' },
+      });
+      
+      if (createUserError) {
+        console.error('[verify-whatsapp-otp] Failed to create user:', createUserError);
+        // Check if user already exists
+        const msg = createUserError.message?.toLowerCase() || '';
+        const code = createUserError.code || '';
+        const isAlreadyRegistered = 
+          code === 'user_already_exists' || 
+          msg.includes('already registered') || 
+          msg.includes('already exists');
+        
+        if (isAlreadyRegistered) {
+          // Try to get user again
+          const { data: userData } = await supabaseAdmin.auth.admin.getUserByEmail(internalEmail);
+          user = userData.user;
+        } else {
+          throw createUserError;
+        }
+      } else {
+        user = data.user;
       }
-      console.log('[verify-whatsapp-otp] User already exists, proceeding to generate session link.');
-    } else {
-      console.log('[verify-whatsapp-otp] New user created successfully');
     }
 
-    console.log('[verify-whatsapp-otp] Generating magic link');
+    if (!user) {
+      throw new Error('Failed to get or create user');
+    }
+
+    console.log('[verify-whatsapp-otp] User found/created:', user.id);
+
+    // Step 2: Generate a magic link (to get a valid token_hash for verifyOtp)
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
       email: internalEmail,
-      options: { redirectTo: 'shopx://auth' }
+      options: { redirectTo: 'shopx://auth' },
     });
 
     if (linkError) {
-      console.error('[verify-whatsapp-otp] Generate link error:', linkError);
+      console.error('[verify-whatsapp-otp] Failed to generate magic link:', linkError);
       throw linkError;
     }
 
-    console.log('[verify-whatsapp-otp] Magic link generated successfully');
     console.log('[verify-whatsapp-otp] Function completed successfully');
-
     return new Response(JSON.stringify({
       success: true,
       token_hash: linkData.properties.hashed_token,
-      email: internalEmail
+      email: internalEmail,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -126,7 +137,6 @@ serve(async (req) => {
     console.error('[verify-whatsapp-otp] Full error:', error);
     console.error('[verify-whatsapp-otp] Error message:', error.message);
     console.error('[verify-whatsapp-otp] Error stack:', error.stack);
-    // Never expose internal errors to client
     return new Response(JSON.stringify({ error: 'Service temporarily unavailable. Please check your admin configuration.' }), {
       status: 503,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
