@@ -8,9 +8,6 @@ import { useAuth } from '../../context/AuthContext';
 const iconMap = {
   index: 'home',
   inventory: 'package',
-  leads: 'trending-up',
-  alerts: 'activity',
-  whatsapp: 'message-circle',
   settings: 'settings',
 } as const;
 
@@ -42,25 +39,27 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         tabBarStyle: {
-          backgroundColor: '#1F2937',
-          borderTopColor: '#374151',
+          backgroundColor: '#09090b',
+          borderTopColor: '#27272a',
           borderTopWidth: 1,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
         },
-        tabBarActiveTintColor: '#0EA5E9',
-        tabBarInactiveTintColor: '#9CA3AF',
-        headerStyle: {
-          backgroundColor: '#1F2937',
+        tabBarActiveTintColor: '#0ea5e9',
+        tabBarInactiveTintColor: '#71717a',
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
         },
-        headerTintColor: '#F9FAFB',
-        headerTitleStyle: {
-          fontWeight: '600',
-        },
+        headerShown: false,
+        animation: 'shift', // Smooth like Apple Freeform
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Feed',
+          title: 'Home',
           tabBarIcon: ({ color, size }) => <Feather name={iconMap.index} color={color} size={size} />,
         }}
       />
@@ -69,28 +68,6 @@ export default function TabLayout() {
         options={{
           title: 'Inventory',
           tabBarIcon: ({ color, size }) => <Feather name={iconMap.inventory} color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="leads"
-        options={{
-          title: 'Leads',
-          tabBarIcon: ({ color, size }) => <Feather name={iconMap.leads} color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="alerts"
-        options={{
-          title: 'Alerts',
-          tabBarIcon: ({ color, size }) => <Feather name={iconMap.alerts} color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="whatsapp"
-        options={{
-          title: 'WhatsApp',
-          tabBarActiveTintColor: '#25D366',
-          tabBarIcon: ({ color, size }) => <Feather name={iconMap.whatsapp} color={color} size={size} />,
         }}
       />
       <Tabs.Screen

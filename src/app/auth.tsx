@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import CountryPicker, { CountryCode, Country } from 'react-native-country-picker-modal';
 import { supabase } from '../lib/supabase';
 
@@ -193,10 +193,11 @@ export default function AuthScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-zinc-950 px-6 justify-center"
-    >
+    <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        className="flex-1 bg-zinc-950 px-6 justify-center"
+      >
       <View className="items-center mb-10">
         <Text className="text-[#0EA5E9] text-4xl font-extrabold tracking-widest">ShopX</Text>
         <Text className="text-zinc-400 mt-2 text-base">Secure Business Access</Text>
@@ -304,6 +305,7 @@ export default function AuthScreen() {
           {loading && <ActivityIndicator className="mt-6" color="#ffffff" />}
         </View>
       )}
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
