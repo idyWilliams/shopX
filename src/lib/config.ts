@@ -1,3 +1,5 @@
+import 'react-native-url-polyfill/auto';
+
 export const validateApiKeys = () => {
   const requiredKeys = [
     { name: 'OPENAI_API_KEY', value: process.env.EXPO_PUBLIC_OPENAI_API_KEY },

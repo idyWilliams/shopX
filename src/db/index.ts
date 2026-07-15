@@ -11,7 +11,7 @@ import { StoreAttendant } from './models/StoreAttendant'
 
 const adapter = new SQLiteAdapter({
   schema,
-  jsi: true, // Use JSI
+  jsi: false, // Use async bridge (required for Expo Go)
   onSetUpError: error => {
     console.error('WatermelonDB setup error', error)
   }
