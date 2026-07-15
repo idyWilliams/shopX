@@ -25,19 +25,25 @@ export const generateLeads = async (
       });
 
       if (response.markdown) {
-        const contactMatches = response.markdown.match(/(?:phone|tel|email|whatsapp):?\s*([^\s\n]+)/gi);
-        if (contactMatches) {
-          const contact = contactMatches[0].split(':')[1].trim();
-          leads.push({
-            merchantId,
-            productInterest: term,
-            contactInfo: contact,
-          });
+        const regex = /(?:phone|tel|email|whatsapp|contact)[\s:]+([+A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\+?[0-9\s-]{7,})/gi;
+        const contactMatches = [...response.markdown.matchAll(regex)];
+        
+        if (contactMatches && contactMatches.length > 0) {
+          // Take the first valid match found
+          const contact = contactMatches[0][1].trim();
+          if (contact) {
+            leads.push({
+              merchantId,
+              productInterest: term,
+              contactInfo: contact,
+            });
+          }
         }
       }
     }
   } catch (error) {
     console.error('Error generating leads:', error);
+    throw new Error(`Failed to generate leads: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 
   return leads;

@@ -30,6 +30,15 @@ export default function AuthScreen() {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
+  const parseJsonSafe = async (res: Response) => {
+    try {
+      const text = await res.text();
+      return text ? JSON.parse(text) : {};
+    } catch {
+      return {};
+    }
+  };
+
   const handleSendCode = async () => {
     setError('');
     setLoading(true);
@@ -50,22 +59,17 @@ export default function AuthScreen() {
         
         if (!response.ok) {
           const errorMsg = 'Service temporarily unavailable. Please check your admin configuration.';
-          try {
-            const data = await response.json();
-            console.error('[Email OTP Error]', {
-              status: response.status,
-              statusText: response.statusText,
-              errorData: data
-            });
-          } catch (parseErr) {
-            console.error('[Email OTP Error] Failed to parse error response:', parseErr);
-          }
+          const data = await parseJsonSafe(response);
+          console.error('[Email OTP Error]', { status: response.status, errorData: data });
           throw new Error(errorMsg);
         }
         console.log(`[OTP] Email OTP sent to: ${email}`);
       } else {
-        if (phone.length < 7) throw new Error('Please enter a valid phone number.');
-        const fullPhone = `+${callingCode}${phone}`;
+        const cleanedPhone = phone.replace(/\D/g, '');
+        if (!cleanedPhone || cleanedPhone.length < 7 || cleanedPhone.length > 15) {
+          throw new Error('Please enter a valid phone number (7 to 15 digits).');
+        }
+        const fullPhone = `+${callingCode}${cleanedPhone}`;
         
         const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/send-whatsapp-otp`, {
           method: 'POST',
@@ -78,16 +82,8 @@ export default function AuthScreen() {
         
         if (!response.ok) {
           const errorMsg = 'Service temporarily unavailable. Please check your admin configuration.';
-          try {
-            const data = await response.json();
-            console.error('[WhatsApp OTP Error]', {
-              status: response.status,
-              statusText: response.statusText,
-              errorData: data
-            });
-          } catch (parseErr) {
-            console.error('[WhatsApp OTP Error] Failed to parse error response:', parseErr);
-          }
+          const data = await parseJsonSafe(response);
+          console.error('[WhatsApp OTP Error]', { status: response.status, errorData: data });
           throw new Error(errorMsg);
         }
       }
@@ -116,18 +112,11 @@ export default function AuthScreen() {
           body: JSON.stringify({ email, otp: enteredOtp }),
         });
         
+        const verifyData = await parseJsonSafe(verifyRes);
+
         if (!verifyRes.ok) {
-          let errorMsg = 'Invalid OTP.';
-          try {
-            const verifyData = await verifyRes.json();
-            if (verifyData.error) errorMsg = verifyData.error;
-            console.error('Email OTP Verify Error:', verifyData);
-          } catch (parseErr) {
-            console.error('Failed to parse verify error:', parseErr);
-          }
-          throw new Error(errorMsg);
+          throw new Error(verifyData.error || 'Invalid OTP.');
         }
-        const verifyData = await verifyRes.json();
 
         const { error: authError } = await supabase.auth.verifyOtp({
           token_hash: verifyData.token_hash,
@@ -135,7 +124,8 @@ export default function AuthScreen() {
         });
         if (authError) throw authError;
       } else {
-        const fullPhone = `+${callingCode}${phone}`;
+        const cleanedPhone = phone.replace(/\D/g, '');
+        const fullPhone = `+${callingCode}${cleanedPhone}`;
         const verifyRes = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/verify-whatsapp-otp`, {
           method: 'POST',
           headers: {
@@ -145,18 +135,11 @@ export default function AuthScreen() {
           body: JSON.stringify({ phone: fullPhone, otp: enteredOtp }),
         });
         
+        const verifyData = await parseJsonSafe(verifyRes);
+
         if (!verifyRes.ok) {
-          let errorMsg = 'Invalid OTP.';
-          try {
-            const verifyData = await verifyRes.json();
-            if (verifyData.error) errorMsg = verifyData.error;
-            console.error('WhatsApp OTP Verify Error:', verifyData);
-          } catch (parseErr) {
-            console.error('Failed to parse verify error:', parseErr);
-          }
-          throw new Error(errorMsg);
+          throw new Error(verifyData.error || 'Invalid OTP.');
         }
-        const verifyData = await verifyRes.json();
 
         const { error: authError } = await supabase.auth.verifyOtp({
           token_hash: verifyData.token_hash,

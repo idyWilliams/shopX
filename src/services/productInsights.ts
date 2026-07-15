@@ -68,10 +68,26 @@ Current Price: ${product.currentPrice} ${product.currency}`;
       })
     });
 
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.warn(`OpenAI API failed with status ${response.status}:`, errorData);
+      return getLocalInsights(product);
+    }
+
     const data = await response.json();
-    const insights = JSON.parse(data.choices[0].message.content);
     
-    return insights as ProductInsights;
+    if (!data.choices || !data.choices[0] || !data.choices[0].message?.content) {
+      console.warn('OpenAI API returned unexpected format:', data);
+      return getLocalInsights(product);
+    }
+
+    try {
+      const insights = JSON.parse(data.choices[0].message.content);
+      return insights as ProductInsights;
+    } catch (parseError) {
+      console.warn('Failed to parse OpenAI response as JSON:', parseError);
+      return getLocalInsights(product);
+    }
   } catch (error) {
     console.error('Error getting product insights:', error);
     return getLocalInsights(product);

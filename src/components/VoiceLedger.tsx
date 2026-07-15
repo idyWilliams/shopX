@@ -21,7 +21,7 @@ const logDataIntegrityAnomaly = async (command: string, details: any, storeId: s
     await db.get<OperationalAnomaly>('operational_anomalies').create((anomaly) => {
       anomaly.anomalyType = 'DATA_INTEGRITY_VIOLATION';
       anomaly.severity = 'medium';
-      anomaly.storeId = storeId || undefined;
+      anomaly.storeId = storeId ?? '';
       anomaly.payload = JSON.stringify({ command, details, timestamp: new Date().toISOString() });
       anomaly.createdAt = new Date();
     });
@@ -109,11 +109,11 @@ const VoiceLedger: React.FC = () => {
       const db = getDatabase();
       await db.write(async () => {
         await db.get<SalesEvent>('sales_events').create((event) => {
-          event.storeId = activeStoreId || undefined;
+          event.storeId = activeStoreId ?? '';
           event.eventType = confirmed.action;
           event.quantity = confirmed.quantity;
           event.priceAtSale = confirmed.price || 0;
-          event.attendantId = currentAttendant?.id || '';
+          event.attendantId = currentAttendant?.id ?? '';
           event.createdAt = new Date();
         });
       });

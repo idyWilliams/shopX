@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AppState, Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import type { Profile, Organization } from '../types';
+import type { Profile, Organization, UserRole } from '../types';
 
 export function usePermissions() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -19,16 +19,45 @@ export function usePermissions() {
 
       try {
         setIsLoading(true);
-        // Mock profile data for now
-        setProfile({
-          id: 'mock-profile-id',
-          user_id: user.id,
-          org_id: 'mock-org-id',
-          role: 'owner',
-          name: 'John Doe',
-          referral_code: 'ABC123'
-        });
-        setIsAdmin(true);
+        
+        // Attempt to fetch as merchant (owner)
+        const { data: merchantData, error: merchantError } = await supabase
+          .from('merchants')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (merchantData) {
+          setProfile({
+            id: merchantData.id,
+            user_id: user.id,
+            org_id: merchantData.id,
+            role: 'owner',
+            name: merchantData.email || 'Owner',
+            referral_code: 'N/A'
+          });
+          setIsAdmin(true);
+          return;
+        }
+
+        // Attempt to fetch as attendant
+        const { data: attendantData, error: attendantError } = await supabase
+          .from('attendants')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+          
+        if (attendantData) {
+           setProfile({
+            id: attendantData.id,
+            user_id: user.id,
+            org_id: 'unknown',
+            role: attendantData.access_level as UserRole,
+            name: attendantData.name,
+            referral_code: 'N/A'
+          });
+          setIsAdmin(attendantData.access_level === 'admin');
+        }
       } catch (error) {
         console.error('Error fetching user profile:', error);
       } finally {
@@ -152,15 +181,26 @@ export function useSubscription() {
 
       try {
         setIsLoading(true);
-        // Mock data for now
-        setOrganization({
-          id: profile.org_id,
-          name: 'Fashion Haven Ltd',
-          tier: 'premium',
-          created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago for trial
-          is_pro: false,
-          pro_expiry_date: null
-        });
+        
+        // Since there is no dedicated organization table in schema, we map stores/merchants
+        // If there are real billing records in the future, fetch them here.
+        const { data: stores, error } = await supabase
+          .from('stores')
+          .select('*')
+          .eq('merchant_id', profile.org_id)
+          .limit(1);
+
+        if (stores && stores.length > 0) {
+          const store = stores[0];
+          setOrganization({
+            id: profile.org_id,
+            name: store.name,
+            tier: 'premium', // Defaulting to premium for MVP
+            created_at: store.created_at,
+            is_pro: true,
+            pro_expiry_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          });
+        }
       } catch (error) {
         console.error('Error fetching organization:', error);
       } finally {

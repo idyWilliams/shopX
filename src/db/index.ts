@@ -1,15 +1,32 @@
+import { Database } from '@nozbe/watermelondb'
+import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite'
 
-// Temporarily disabled WatermelonDB to fix native module error
-// We'll use Supabase for all data needs right now!
+import { schema } from './schema'
+import { SalesEvent } from './models/SalesEvent'
+import { OperationalAnomaly } from './models/OperationalAnomaly'
+import { CashDrawerLog } from './models/CashDrawerLog'
+import { Lead } from './models/Lead'
+import { Product } from './models/Product'
+import { StoreAttendant } from './models/StoreAttendant'
 
-export const getDatabase = () => {
-  console.warn('WatermelonDB is temporarily disabled');
-  return null as any;
-};
+const adapter = new SQLiteAdapter({
+  schema,
+  jsi: true, // Use JSI
+  onSetUpError: error => {
+    console.error('WatermelonDB setup error', error)
+  }
+})
 
-export const database = new Proxy({} as any, {
-  get: () => {
-    console.warn('WatermelonDB is temporarily disabled');
-    return () => {};
-  },
-});
+export const database = new Database({
+  adapter,
+  modelClasses: [
+    SalesEvent,
+    OperationalAnomaly,
+    CashDrawerLog,
+    Lead,
+    Product,
+    StoreAttendant
+  ],
+})
+
+export const getDatabase = () => database;

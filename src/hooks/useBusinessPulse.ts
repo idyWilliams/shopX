@@ -52,11 +52,11 @@ export function useBusinessPulse(): BusinessPulseState & BusinessPulseActions {
             alerts.push({
               id: `stale-${product.id}`,
               product_id: product.id,
-              location_id: product.storeId || '',
+              location_id: product.orgId || '',
               quantity: product.stockQuantity,
               days_inactive: daysSinceLastSale,
               product_name: product.name,
-              location_name: product.storeId || 'Unknown',
+              location_name: product.orgId || 'Unknown',
             });
           }
         }

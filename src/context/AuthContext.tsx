@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { getDatabase } from '../db';
-import { Store } from '../db/models/Store';
-import { Attendant } from '../db/models/Attendant';
-import { StoreAttendant } from '../db/models/StoreAttendant';
-import { Merchant } from '../db/models/Merchant';
+
+// Simplified types for disabled WatermelonDB
+type SimpleStore = { id: string; name: string; merchantId: string; locationAddress?: string };
+type SimpleAttendant = { id: string; name: string };
+type SimpleMerchant = { id: string; name: string };
 
 type AuthContextType = {
   user: User | null;
@@ -13,16 +13,16 @@ type AuthContextType = {
   loading: boolean;
   activeStoreId: string | null;
   setActiveStoreId: (storeId: string | null) => void;
-  authorizedStores: Store[];
-  setAuthorizedStores: (stores: Store[]) => void;
-  currentAttendant: Attendant | null;
-  setCurrentAttendant: (attendant: Attendant | null) => void;
+  authorizedStores: SimpleStore[];
+  setAuthorizedStores: (stores: SimpleStore[]) => void;
+  currentAttendant: SimpleAttendant | null;
+  setCurrentAttendant: (attendant: SimpleAttendant | null) => void;
   soloOwner: boolean;
   setSoloOwner: (solo: boolean) => void;
-  currentMerchant: Merchant | null;
+  currentMerchant: SimpleMerchant | null;
   loadAllStoresForOwner: (merchantId: string) => Promise<void>;
   loadAuthorizedStoresForAttendant: (attendantId: string) => Promise<void>;
-  createDefaultStore: (merchantId: string) => Promise<Store>;
+  createDefaultStore: (merchantId: string) => Promise<SimpleStore>;
   signOut: () => Promise<void>;
 };
 
@@ -50,10 +50,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
-  const [authorizedStores, setAuthorizedStores] = useState<Store[]>([]);
-  const [currentAttendant, setCurrentAttendant] = useState<Attendant | null>(null);
+  const [authorizedStores, setAuthorizedStores] = useState<SimpleStore[]>([]);
+  const [currentAttendant, setCurrentAttendant] = useState<SimpleAttendant | null>(null);
   const [soloOwner, setSoloOwner] = useState(true);
-  const [currentMerchant, setCurrentMerchant] = useState<Merchant | null>(null);
+  const [currentMerchant, setCurrentMerchant] = useState<SimpleMerchant | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -71,49 +71,97 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const createDefaultStore = async (merchantId: string): Promise<Store> => {
-    const db = getDatabase();
-    let store: Store;
-    await db.write(async () => {
-      store = await db.get<Store>('stores').create(s => {
-        s.merchantId = merchantId;
-        s.name = 'Default Shop';
-      });
-    });
-    return store!;
+  const createDefaultStore = async (merchantId: string): Promise<SimpleStore> => {
+    // Create a merchant record if it doesn't exist
+    const { data: merchantData, error: merchantError } = await supabase
+      .from('merchants')
+      .upsert({ id: merchantId, email: user?.email || '' })
+      .select()
+      .single();
+
+    if (merchantError && merchantError.code !== '23505') {
+      console.error('Error creating merchant:', merchantError);
+    }
+
+    const { data, error } = await supabase
+      .from('stores')
+      .insert({ merchant_id: merchantId, name: 'Default Shop' })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating default store:', error);
+      throw error;
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      merchantId: data.merchant_id,
+    };
   };
 
   const loadAllStoresForOwner = async (merchantId: string) => {
-    const db = getDatabase();
-    const allStores = await db.get<Store>('stores').query().fetch();
-    const ownerStores = allStores.filter(s => s.merchantId === merchantId);
-    
-    if (ownerStores.length === 0) {
-      const defaultStore = await createDefaultStore(merchantId);
-      setAuthorizedStores([defaultStore]);
-      setActiveStoreId(defaultStore.id);
-    } else {
-      setAuthorizedStores(ownerStores);
-      setActiveStoreId(ownerStores[0].id);
+    try {
+      const { data, error } = await supabase
+        .from('stores')
+        .select('*')
+        .eq('merchant_id', merchantId);
+
+      if (error) throw error;
+
+      let stores = data || [];
+      
+      if (stores.length === 0) {
+        const defaultStore = await createDefaultStore(merchantId);
+        stores = [defaultStore];
+      }
+
+      const formattedStores = stores.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        merchantId: s.merchant_id || s.merchantId,
+      }));
+
+      setAuthorizedStores(formattedStores);
+      if (formattedStores.length > 0) {
+        setActiveStoreId(formattedStores[0].id);
+      }
+    } catch (err) {
+      console.error('Failed to load stores for owner:', err);
     }
   };
 
   const loadAuthorizedStoresForAttendant = async (attendantId: string) => {
-    const db = getDatabase();
-    // Get all store_attendant relationships for this attendant
-    const storeAttendants = await db
-      .get<StoreAttendant>('store_attendants')
-      .query()
-      .fetch();
+    try {
+      const { data, error } = await supabase
+        .from('store_attendants')
+        .select(`
+          stores (
+            id,
+            name,
+            merchant_id
+          )
+        `)
+        .eq('attendant_id', attendantId);
 
-    const storeIds = storeAttendants
-      .filter(sa => sa.attendantId === attendantId)
-      .map(sa => sa.storeId);
+      if (error) throw error;
 
-    // Get all stores
-    const allStores = await db.get<Store>('stores').query().fetch();
-    const authorized = allStores.filter(s => storeIds.includes(s.id));
-    setAuthorizedStores(authorized);
+      if (data) {
+        const stores = data
+          .map((d: any) => d.stores)
+          .filter(Boolean)
+          .map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            merchantId: s.merchant_id,
+          }));
+        
+        setAuthorizedStores(stores);
+      }
+    } catch (err) {
+      console.error('Failed to load stores for attendant:', err);
+    }
   };
 
   const signOut = async () => {

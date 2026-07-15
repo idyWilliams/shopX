@@ -47,7 +47,7 @@ const OwnerDashboard: React.FC = () => {
   };
 
   const renderAnomalyItem = ({ item }: { item: OperationalAnomaly }) => {
-    const severityColors = {
+    const severityColors: Record<string, string> = {
       low: '#10B981',
       medium: '#F59E0B',
       critical: '#EF4444',
@@ -69,11 +69,11 @@ const OwnerDashboard: React.FC = () => {
           </View>
           <View
             className="px-3 py-1 rounded-full"
-            style={{ backgroundColor: `${severityColors[item.severity]}20` }}
+            style={{ backgroundColor: `${severityColors[item.severity] ?? '#6b7280'}20` }}
           >
             <Text
               className="text-xs font-bold"
-              style={{ color: severityColors[item.severity] }}
+              style={{ color: severityColors[item.severity] ?? '#6b7280' }}
             >
               {item.severity.toUpperCase()}
             </Text>

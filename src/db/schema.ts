@@ -1,115 +1,42 @@
-import { appSchema, tableSchema } from '@nozbe/watermelondb';
+import { appSchema, tableSchema } from '@nozbe/watermelondb'
 
-export const mySchema = appSchema({
-  version: 4, // Incremented schema version
+export const schema = appSchema({
+  version: 1,
   tables: [
-    tableSchema({
-      name: 'merchants',
-      columns: [
-        { name: 'email', type: 'string' },
-        { name: 'phone', type: 'string', isOptional: true },
-      ],
-    }),
-    tableSchema({
-      name: 'stores',
-      columns: [
-        { name: 'merchant_id', type: 'string' },
-        { name: 'name', type: 'string' },
-        { name: 'location_address', type: 'string', isOptional: true },
-      ],
-    }),
-    tableSchema({
-      name: 'attendants',
-      columns: [
-        { name: 'name', type: 'string' },
-        { name: 'hashed_pin', type: 'string' },
-        { name: 'access_level', type: 'string' },
-      ],
-    }),
-    tableSchema({
-      name: 'store_attendants',
-      columns: [
-        { name: 'store_id', type: 'string' },
-        { name: 'attendant_id', type: 'string' },
-      ],
-    }),
-    tableSchema({
-      name: 'products',
-      columns: [
-        { name: 'store_id', type: 'string', isOptional: true },
-        { name: 'name', type: 'string' },
-        { name: 'sku', type: 'string' },
-        { name: 'retail_price', type: 'number' },
-        { name: 'wholesale_price', type: 'number' },
-        { name: 'stock_quantity', type: 'number' },
-        { name: 'is_active', type: 'boolean' },
-        // New fields for enhanced product info
-        { name: 'description', type: 'string', isOptional: true },
-        { name: 'image_url', type: 'string', isOptional: true },
-        { name: 'category', type: 'string', isOptional: true },
-        { name: 'manufacturer', type: 'string', isOptional: true },
-        { name: 'cost_price', type: 'number', isOptional: true }, // Cost to purchase
-        { name: 'minimum_stock_level', type: 'number', isOptional: true }, // Low stock alert
-      ],
-    }),
-    // New table for price history tracking
-    tableSchema({
-      name: 'price_history',
-      columns: [
-        { name: 'product_id', type: 'string' },
-        { name: 'old_retail_price', type: 'number', isOptional: true },
-        { name: 'new_retail_price', type: 'number' },
-        { name: 'old_wholesale_price', type: 'number', isOptional: true },
-        { name: 'new_wholesale_price', type: 'number', isOptional: true },
-        { name: 'changed_by', type: 'string' }, // User ID of who changed it
-        { name: 'reason', type: 'string', isOptional: true }, // Why the price changed
-        { name: 'created_at', type: 'number' },
-      ],
-    }),
     tableSchema({
       name: 'sales_events',
       columns: [
-        { name: 'store_id', type: 'string', isOptional: true },
+        { name: 'store_id', type: 'string' },
         { name: 'ticket_id', type: 'string', isOptional: true },
-        { name: 'product_id', type: 'string' },
+        { name: 'product_id', type: 'string', isOptional: true },
         { name: 'quantity', type: 'number' },
         { name: 'price_at_sale', type: 'number' },
         { name: 'event_type', type: 'string' },
-        { name: 'attendant_id', type: 'string' },
+        { name: 'attendant_id', type: 'string', isOptional: true },
         { name: 'created_at', type: 'number' },
-      ],
+      ]
+    }),
+    tableSchema({
+      name: 'operational_anomalies',
+      columns: [
+        { name: 'store_id', type: 'string' },
+        { name: 'anomaly_type', type: 'string' },
+        { name: 'severity', type: 'string' },
+        { name: 'payload', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+      ]
     }),
     tableSchema({
       name: 'cash_drawer_logs',
       columns: [
-        { name: 'store_id', type: 'string', isOptional: true },
+        { name: 'store_id', type: 'string' },
         { name: 'shift_id', type: 'string' },
         { name: 'event_type', type: 'string' },
         { name: 'expected_amount', type: 'number' },
         { name: 'actual_amount', type: 'number' },
         { name: 'discrepancy', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },
-      ],
-    }),
-    tableSchema({
-      name: 'device_registry',
-      columns: [
-        { name: 'store_id', type: 'string', isOptional: true },
-        { name: 'device_fingerprint', type: 'string' },
-        { name: 'authorized_network_bssid', type: 'string', isOptional: true },
-        { name: 'is_trusted', type: 'boolean' },
-        { name: 'last_login', type: 'number' },
-      ],
-    }),
-    tableSchema({
-      name: 'operational_anomalies',
-      columns: [
-        { name: 'store_id', type: 'string', isOptional: true },
-        { name: 'anomaly_type', type: 'string' },
-        { name: 'severity', type: 'string' },
-        { name: 'payload', type: 'string', isOptional: true },
-        { name: 'created_at', type: 'number' },
-      ],
+      ]
     }),
     tableSchema({
       name: 'leads',
@@ -119,7 +46,30 @@ export const mySchema = appSchema({
         { name: 'contact_info', type: 'string' },
         { name: 'status', type: 'string' },
         { name: 'created_at', type: 'number' },
-      ],
+      ]
     }),
-  ],
-});
+    tableSchema({
+      name: 'products',
+      columns: [
+        { name: 'org_id', type: 'string' },
+        { name: 'name', type: 'string' },
+        { name: 'category', type: 'string', isOptional: true },
+        { name: 'image_url', type: 'string', isOptional: true },
+        { name: 'base_currency', type: 'string' },
+        { name: 'cost_price', type: 'number' },
+        { name: 'selling_price', type: 'number' },
+        { name: 'stock_quantity', type: 'number' },
+        { name: 'created_at', type: 'number' },
+      ]
+    }),
+    tableSchema({
+      name: 'store_attendants',
+      columns: [
+        { name: 'store_id', type: 'string' },
+        { name: 'attendant_id', type: 'string' },
+        { name: 'access_level', type: 'string' },
+        { name: 'created_at', type: 'number' },
+      ]
+    })
+  ]
+})

@@ -1,35 +1,10 @@
-// src/lib/whatsapp.ts
-
-// WhatsApp service layer for Meta API integration
-// Note: The actual API calls should be handled by your backend/Supabase Edge Functions
-// This is a frontend placeholder that demonstrates the architectural pattern
-
+import { supabase } from './supabase';
 import type { OperationalAnomaly } from '../db/models/OperationalAnomaly';
 import type { DailyAnomalyReport } from '../services/anomalyEngine';
 
-interface WhatsAppOptions {
-  apiToken: string;
-  phoneNumberId: string;
-  businessPhoneNumber: string;
-}
-
 export class WhatsAppService {
-  private apiToken: string;
-  private phoneNumberId: string;
-  private businessPhoneNumber: string;
-  private baseUrl = 'https://graph.facebook.com/v19.0';
-
-  constructor(options: WhatsAppOptions) {
-    this.apiToken = options.apiToken;
-    this.phoneNumberId = options.phoneNumberId;
-    this.businessPhoneNumber = options.businessPhoneNumber;
-  }
-
   /**
-   * Sends a template message via WhatsApp
-   * @param templateName - The name of the template to use
-   * @param recipient - Recipient phone number in E.164 format
-   * @param templateParams - Optional parameters for the template
+   * Sends a template message via WhatsApp Edge Function
    */
   async sendTemplateMessage(
     templateName: string,
@@ -37,16 +12,14 @@ export class WhatsAppService {
     templateParams?: Record<string, string>
   ): Promise<void> {
     try {
-      console.log(`[WhatsApp] Sending template "${templateName}" to ${recipient}`);
+      console.log(`[WhatsApp] Calling edge function for template "${templateName}" to ${recipient}`);
       
-      // TODO: Replace with actual Meta API call to your backend/Edge Function
-      // Example API endpoint (should be server-side, not client-side!):
-      // https://graph.facebook.com/v19.0/${this.phoneNumberId}/messages
+      const { error } = await supabase.functions.invoke('whatsapp-send-template', {
+        body: { templateName, recipient, templateParams }
+      });
       
-      // For now, simulate a successful send
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      console.log('[WhatsApp] Message sent successfully!');
+      if (error) throw error;
+      console.log('[WhatsApp] Template message sent successfully via Edge Function!');
     } catch (error) {
       console.error('[WhatsApp] Error sending template message:', error);
       throw new Error('Failed to send WhatsApp message');
@@ -54,20 +27,18 @@ export class WhatsAppService {
   }
 
   /**
-   * Handles incoming voice notes from WhatsApp
-   * @param audioUrl - URL of the audio file from WhatsApp
+   * Handles incoming voice notes from WhatsApp Edge Function
    */
   async handleVoiceNote(audioUrl: string): Promise<string> {
     try {
       console.log('[WhatsApp] Processing voice note from:', audioUrl);
       
-      // TODO: Replace with actual audio processing/transcription call
-      // Should forward to your backend for secure processing with OpenAI/Whisper etc.
+      const { data, error } = await supabase.functions.invoke('whatsapp-process-audio', {
+        body: { audioUrl }
+      });
       
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Return mock transcription for demo purposes
-      return 'Transcribed text from voice note would appear here';
+      if (error) throw error;
+      return data.transcription || 'Transcription unavailable';
     } catch (error) {
       console.error('[WhatsApp] Error processing voice note:', error);
       throw new Error('Failed to process voice note');
@@ -75,17 +46,17 @@ export class WhatsAppService {
   }
 
   /**
-   * Sends a text message to a customer
-   * @param recipient - Recipient phone number
-   * @param text - Message text
+   * Sends a text message to a customer via Edge Function
    */
   async sendTextMessage(recipient: string, text: string): Promise<void> {
     try {
-      console.log(`[WhatsApp] Sending text to ${recipient}:`, text);
+      console.log(`[WhatsApp] Sending text to ${recipient} via Edge Function`);
       
-      // TODO: Replace with actual Meta API call (via backend/Edge Function)
+      const { error } = await supabase.functions.invoke('whatsapp-send-text', {
+        body: { recipient, text }
+      });
       
-      await new Promise(resolve => setTimeout(resolve, 600));
+      if (error) throw error;
     } catch (error) {
       console.error('[WhatsApp] Error sending text message:', error);
       throw error;
@@ -93,13 +64,8 @@ export class WhatsAppService {
   }
 }
 
-// Initialize with placeholders
-const whatsappService = new WhatsAppService({
-  apiToken: process.env.WHATSAPP_API_TOKEN || '',
-  phoneNumberId: process.env.WHATSAPP_PHONE_ID || '',
-  businessPhoneNumber: '2348001234567',
-});
-
+// Initialize
+const whatsappService = new WhatsAppService();
 export default whatsappService;
 
 // --- NEW FUNCTIONS FOR SHAREABLE INSIGHTS ---

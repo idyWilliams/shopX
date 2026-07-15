@@ -1,46 +1,17 @@
-import { Model } from '@nozbe/watermelondb';
-import { field } from '@nozbe/watermelondb/decorators';
+import { Model } from '@nozbe/watermelondb'
+import { field, date, readonly } from '@nozbe/watermelondb/decorators'
 
 export class Product extends Model {
-  static table = 'products';
+  static table = 'products'
 
-  @field('store_id')
-  storeId?: string;
-
-  @field('name')
-  name!: string;
-
-  @field('sku')
-  sku!: string;
-
-  @field('retail_price')
-  retailPrice!: number;
-
-  @field('wholesale_price')
-  wholesalePrice!: number;
-
-  @field('stock_quantity')
-  stockQuantity!: number;
-
-  @field('is_active')
-  isActive!: boolean;
-
-  // New fields
-  @field('description')
-  description?: string;
-
-  @field('image_url')
-  imageUrl?: string;
-
-  @field('category')
-  category?: string;
-
-  @field('manufacturer')
-  manufacturer?: string;
-
-  @field('cost_price')
-  costPrice?: number;
-
-  @field('minimum_stock_level')
-  minimumStockLevel?: number;
+  @field('org_id') orgId!: string
+  @field('name') name!: string
+  @field('category') category?: string
+  @field('image_url') imageUrl?: string
+  @field('base_currency') baseCurrency!: string
+  @field('cost_price') costPrice!: number
+  @field('selling_price') sellingPrice!: number
+  @field('stock_quantity') stockQuantity!: number
+  
+  @readonly @date('created_at') createdAt!: Date
 }

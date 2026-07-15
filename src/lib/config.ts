@@ -1,7 +1,9 @@
 export const validateApiKeys = () => {
   const requiredKeys = [
     { name: 'OPENAI_API_KEY', value: process.env.EXPO_PUBLIC_OPENAI_API_KEY },
-    { name: 'FIRECRAWL_API_KEY', value: process.env.EXPO_PUBLIC_FIRECRAWL_API_KEY }
+    { name: 'FIRECRAWL_API_KEY', value: process.env.EXPO_PUBLIC_FIRECRAWL_API_KEY },
+    { name: 'SUPABASE_URL', value: process.env.EXPO_PUBLIC_SUPABASE_URL },
+    { name: 'SUPABASE_ANON_KEY', value: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY }
   ];
 
   const missing = requiredKeys.filter(key => !key.value);
