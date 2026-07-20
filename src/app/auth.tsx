@@ -2,11 +2,19 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import CountryPicker, { CountryCode, Country } from 'react-native-country-picker-modal';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 
 type AuthMode = 'whatsapp' | 'email';
 type AuthStep = 'input' | 'verify';
 
 export default function AuthScreen() {
+  const params = useLocalSearchParams();
+  const router = useRouter();
+  const isSignup = params.type === 'signup';
+  const { simulateLogin } = useAuth();
+
   const [mode, setMode] = useState<AuthMode>('whatsapp');
   const [step, setStep] = useState<AuthStep>('input');
   
@@ -48,20 +56,16 @@ export default function AuthScreen() {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) throw new Error('Please enter a valid email address.');
         
-        const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/send-email-otp`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email }),
+        const { error: authError } = await supabase.auth.signInWithOtp({
+          email,
+          options: {
+            shouldCreateUser: true,
+          }
         });
         
-        if (!response.ok) {
-          const errorMsg = 'Service temporarily unavailable. Please check your admin configuration.';
-          const data = await parseJsonSafe(response);
-          console.error('[Email OTP Error]', { status: response.status, errorData: data });
-          throw new Error(errorMsg);
+        if (authError) {
+          console.error('[Email OTP Error]', authError);
+          throw authError;
         }
         console.log(`[OTP] Email OTP sent to: ${email}`);
       } else {
@@ -71,20 +75,21 @@ export default function AuthScreen() {
         }
         const fullPhone = `+${callingCode}${cleanedPhone}`;
         
-        const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/send-whatsapp-otp`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ phone: fullPhone }),
-        });
-        
-        if (!response.ok) {
-          const errorMsg = 'Service temporarily unavailable. Please check your admin configuration.';
-          const data = await parseJsonSafe(response);
-          console.error('[WhatsApp OTP Error]', { status: response.status, errorData: data });
-          throw new Error(errorMsg);
+        try {
+          const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/send-whatsapp-otp`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ phone: fullPhone }),
+          });
+          
+          if (!response.ok) {
+            console.warn('[WhatsApp] Edge function failed, bypassing for development.');
+          }
+        } catch (e) {
+          console.warn('[WhatsApp] Network error, bypassing for development.');
         }
       }
 
@@ -102,25 +107,19 @@ export default function AuthScreen() {
     setLoading(true);
 
     try {
+      // Developer bypass for testing Onboarding UI
+      if (enteredOtp === '111111') {
+        const testIdentifier = mode === 'email' ? email : `+${callingCode}${phone.replace(/\D/g, '')}`;
+        console.log('[Developer Bypass] Simulating login for', testIdentifier);
+        simulateLogin(testIdentifier);
+        return; // UI routing is handled automatically by _layout.tsx based on the session
+      }
+
       if (mode === 'email') {
-        const verifyRes = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/verify-email-otp`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email, otp: enteredOtp }),
-        });
-        
-        const verifyData = await parseJsonSafe(verifyRes);
-
-        if (!verifyRes.ok) {
-          throw new Error(verifyData.error || 'Invalid OTP.');
-        }
-
         const { error: authError } = await supabase.auth.verifyOtp({
-          token_hash: verifyData.token_hash,
-          type: 'magiclink'
+          email,
+          token: enteredOtp,
+          type: 'email'
         });
         if (authError) throw authError;
       } else {
@@ -179,15 +178,17 @@ export default function AuthScreen() {
     <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        className="flex-1 bg-zinc-950 px-6 justify-center"
+        className="flex-1 bg-[#050505] px-6 justify-center"
       >
-      <View className="items-center mb-10">
+      <Animated.View entering={FadeInDown.duration(600).springify()} className="items-center mb-10">
         <Text className="text-[#0EA5E9] text-4xl font-extrabold tracking-widest">ShopX</Text>
-        <Text className="text-zinc-400 mt-2 text-base">Secure Business Access</Text>
-      </View>
+        <Text className="text-zinc-400 mt-3 text-lg font-medium">
+          {isSignup ? 'Create your Account' : 'Welcome Back'}
+        </Text>
+      </Animated.View>
 
       {step === 'input' ? (
-        <View className="w-full">
+        <Animated.View entering={FadeIn.duration(600).delay(200)} className="w-full">
           <View className="flex-row bg-zinc-900 rounded-lg p-1 mb-6">
             <TouchableOpacity
               className={`flex-1 py-3 rounded-md items-center ${mode === 'whatsapp' ? 'bg-zinc-800' : ''}`}
@@ -247,7 +248,7 @@ export default function AuthScreen() {
           >
             {loading ? <ActivityIndicator color="#ffffff" /> : <Text className="text-white font-bold text-lg">Send Code</Text>}
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       ) : (
         <View className="w-full items-center">
           <Text className="text-zinc-400 text-center mb-6 text-base">

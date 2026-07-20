@@ -16,6 +16,7 @@ function RootLayoutNav() {
     authorizedStores, 
     currentAttendant, 
     soloOwner,
+    hasLoadedStores,
     loadAllStoresForOwner,
     setActiveStoreId,
     setAuthorizedStores,
@@ -53,23 +54,27 @@ function RootLayoutNav() {
   useEffect(() => {
     if (loading || !deviceChecked) return;
 
+    const inWelcome = segments[0] === 'welcome';
     const inAuthGroup = segments[0] === 'auth';
     const inSelectShopGroup = segments[0] === 'select-shop';
     const inOnboarding = segments[0] === 'onboarding';
 
-    if (!session && !inAuthGroup && !inOnboarding) {
-      router.replace('/auth');
+    if (!session && !inAuthGroup && !inOnboarding && !inWelcome) {
+      router.replace('/welcome');
     } else if (session) {
       // For solo owner, always load owner's stores first
-      if (soloOwner && authorizedStores.length === 0) {
-        // Load all stores for owner (which creates default if none)
+      if (soloOwner && !hasLoadedStores) {
         loadAllStoresForOwner(session.user.id);
+        return; // wait for it to load
       }
 
-      if (inAuthGroup) {
+      if (inAuthGroup || inWelcome) {
         if (soloOwner) {
-          // Bypass select shop and PIN for solo owner
-          router.replace('/(tabs)');
+          if (authorizedStores.length === 0) {
+            router.replace('/onboarding');
+          } else {
+            router.replace('/(tabs)');
+          }
         } else {
           // Check if we need to select a shop or go to tabs
           if (!activeStoreId && authorizedStores.length > 1) {
@@ -83,9 +88,12 @@ function RootLayoutNav() {
         }
       } else if (!inSelectShopGroup && !inOnboarding && !activeStoreId && authorizedStores.length > 1 && !soloOwner) {
         router.replace('/select-shop');
+      } else if (soloOwner && authorizedStores.length === 0 && !inOnboarding) {
+        // If they navigate away from onboarding without stores, push them back
+        router.replace('/onboarding');
       }
     }
-  }, [session, loading, segments, deviceChecked, activeStoreId, authorizedStores, soloOwner]);
+  }, [session, loading, segments, deviceChecked, activeStoreId, authorizedStores, soloOwner, hasLoadedStores]);
 
   if (loading || !deviceChecked) {
     return (

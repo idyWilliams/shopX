@@ -1,214 +1,205 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Image, Modal, FlatList, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { router } from 'expo-router';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 const Onboarding = () => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const { 
-    setActiveStoreId, setAuthorizedStores, setSoloOwner, createDefaultStore } = useAuth();
+  const { setActiveStoreId, setAuthorizedStores, setSoloOwner, createDefaultStore } = useAuth();
 
-  // Step 1: Store Setup
+  const [storeName, setStoreName] = useState('');
+  const [storeLogo, setStoreLogo] = useState<string | null>(null);
+  const [storeCategory, setStoreCategory] = useState('');
+  const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
   const [merchantEmail, setMerchantEmail] = useState('');
   const [merchantPhone, setMerchantPhone] = useState('');
-  const [storeName, setStoreName] = useState('');
-  const [storeCategory, setStoreCategory] = useState('');
   const [isSoloOwner, setIsSoloOwner] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const categories = [
+    'Retail', 'Electronics', 'Grocery', 'Fashion & Apparel',
+    'Health & Beauty', 'Restaurant & Cafe', 'Hardware', 'Services', 'Other'
+  ];
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      setStoreLogo(result.assets[0].uri);
+    }
+  };
 
   const completeStep1 = async () => {
     if (!merchantEmail) {
-      Alert.alert('Error', 'Please enter merchant email');
+      Alert.alert('Error', 'Please enter your admin email');
       return;
     }
-    
-    completeSoloOwnerOnboarding();
-  };
+    if (!storeName) {
+      Alert.alert('Error', 'Please enter a Store Name');
+      return;
+    }
 
-  const completeSoloOwnerOnboarding = async () => {
+    setIsSubmitting(true);
     try {
-      const defaultStore = await createDefaultStore('temp-merchant-id', storeName, storeCategory);
+      const defaultStore = await createDefaultStore('temp-merchant-id', storeName, storeCategory, storeLogo || undefined);
 
       setSoloOwner(true);
       setActiveStoreId(defaultStore.id);
       setAuthorizedStores([defaultStore]);
 
-      Alert.alert('Success', 'Onboarding complete!');
       router.replace('/(tabs)');
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to complete onboarding');
+      Alert.alert('Error', 'Failed to complete setup');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const renderStep1 = () => (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Welcome to ShopX!</Text>
-      <Text style={styles.subtitle}>Let's get your business set up</Text>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Your Email</Text>
-        <TextInput
-          style={styles.input}
-          value={merchantEmail}
-          onChangeText={setMerchantEmail}
-          placeholder="Enter email"
-          placeholderTextColor="#71717A"
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Store Name</Text>
-        <TextInput
-          style={styles.input}
-          value={storeName}
-          onChangeText={setStoreName}
-          placeholder="e.g. Ade's Provision Shop"
-          placeholderTextColor="#71717A"
-        />
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Store Category</Text>
-        <TextInput
-          style={styles.input}
-          value={storeCategory}
-          onChangeText={setStoreCategory}
-          placeholder="e.g. Retail, Electronics, Grocery"
-          placeholderTextColor="#71717A"
-        />
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Your Phone (optional)</Text>
-        <TextInput
-          style={styles.input}
-          value={merchantPhone}
-          onChangeText={setMerchantPhone}
-          placeholder="Enter phone number"
-          placeholderTextColor="#71717A"
-          keyboardType="phone-pad"
-        />
-      </View>
-
-      <TouchableOpacity
-        style={styles.checkboxContainer}
-        onPress={() => setIsSoloOwner(!isSoloOwner)}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.checkbox, isSoloOwner && styles.checkboxActive]}>
-          {isSoloOwner && <Feather name="check" size={18} color="white" />}
-        </View>
-        <Text style={styles.checkboxLabel}>I manage this shop alone</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.button} onPress={completeStep1}>
-        <Text style={styles.buttonText}>Complete Setup</Text>
-      </TouchableOpacity>
-    </ScrollView>
-  );
-
   return (
-    <View style={styles.screen}>
-      <View style={styles.stepIndicator}>
-        <View style={[styles.stepDot, currentStep >=1 && styles.stepDotActive]} />
-      </View>
-      {currentStep ===1 && renderStep1()}
-    </View>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: '#050505' }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View className="flex-1">
+          {/* Background FX */}
+          <View className="absolute top-0 w-full h-96 opacity-20 pointer-events-none">
+            <View className="absolute top-[-50] left-[-50] w-72 h-72 rounded-full bg-[#0EA5E9] blur-3xl opacity-30" />
+            <View className="absolute top-[50] right-[-50] w-72 h-72 rounded-full bg-emerald-500 blur-3xl opacity-20" />
+          </View>
+
+          <ScrollView className="flex-1 px-6 pt-20 pb-12" showsVerticalScrollIndicator={false}>
+            <Animated.View entering={FadeInDown.duration(600).springify()} className="mb-10">
+              <Text className="text-white text-4xl font-extrabold tracking-tight mb-2">Shop Setup</Text>
+              <Text className="text-zinc-400 text-base">Let's craft your digital storefront.</Text>
+            </Animated.View>
+
+             <Animated.View entering={FadeInDown.duration(600).delay(200).springify()} className="mb-6 flex-row items-center justify-between bg-white/5 border border-white/10 p-5 rounded-2xl">
+              <View>
+                <Text className="text-zinc-300 font-semibold text-base mb-1">Store Logo</Text>
+                <Text className="text-zinc-500 text-sm">Make it recognizable</Text>
+              </View>
+              <TouchableOpacity
+                onPress={pickImage}
+                className="h-16 w-16 rounded-full bg-zinc-900 border border-zinc-800 items-center justify-center overflow-hidden"
+              >
+                {storeLogo ? (
+                  <Image source={{ uri: storeLogo }} className="w-full h-full" />
+                ) : (
+                  <Feather name="camera" size={20} color="#0EA5E9" />
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.duration(600).delay(100).springify()} className="mb-6">
+              <Text className="text-zinc-300 font-semibold mb-2 ml-1 text-sm uppercase tracking-wider">Store Name</Text>
+              <TextInput
+                className="bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-base shadow-sm"
+                value={storeName}
+                onChangeText={setStoreName}
+                placeholder="e.g. Ade's Provision Shop"
+                placeholderTextColor="#71717A"
+              />
+            </Animated.View>
+
+
+
+            <Animated.View entering={FadeInDown.duration(600).delay(300).springify()} className="mb-6">
+              <Text className="text-zinc-300 font-semibold mb-2 ml-1 text-sm uppercase tracking-wider">Business Category</Text>
+              <TouchableOpacity
+                className="bg-white/5 border border-white/10 rounded-2xl px-5 py-4 flex-row justify-between items-center shadow-sm"
+                onPress={() => setIsCategoryModalVisible(true)}
+              >
+                <Text className={`text-base ${storeCategory ? 'text-white font-medium' : 'text-zinc-500'}`}>
+                  {storeCategory || 'Select a Category'}
+                </Text>
+                <Feather name="chevron-down" size={20} color="#71717A" />
+              </TouchableOpacity>
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.duration(600).delay(400).springify()} className="mb-6">
+              <Text className="text-zinc-300 font-semibold mb-2 ml-1 text-sm uppercase tracking-wider">Admin Email</Text>
+              <TextInput
+                className="bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-base shadow-sm"
+                value={merchantEmail}
+                onChangeText={setMerchantEmail}
+                placeholder="Enter email address"
+                placeholderTextColor="#71717A"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </Animated.View>
+
+            <Animated.View entering={FadeInDown.duration(600).delay(500).springify()} className="mb-10">
+              <Text className="text-zinc-300 font-semibold mb-2 ml-1 text-sm uppercase tracking-wider">Contact Phone (Optional)</Text>
+              <TextInput
+                className="bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white text-base shadow-sm"
+                value={merchantPhone}
+                onChangeText={setMerchantPhone}
+                placeholder="Enter phone number"
+                placeholderTextColor="#71717A"
+                keyboardType="phone-pad"
+              />
+            </Animated.View>
+
+            <Animated.View entering={FadeInUp.duration(600).delay(600).springify()} className="mb-12">
+              <TouchableOpacity
+                className={`h-14 rounded-2xl items-center justify-center shadow-lg ${isSubmitting ? 'bg-[#0EA5E9]/50' : 'bg-[#0EA5E9] shadow-sky-500/30'}`}
+                onPress={completeStep1}
+                disabled={isSubmitting}
+                activeOpacity={0.8}
+              >
+                <Text className="text-white font-bold text-lg">
+                  {isSubmitting ? 'Setting up...' : 'Complete Setup'}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </ScrollView>
+
+          {/* Category Picker Modal */}
+          <Modal visible={isCategoryModalVisible} animationType="slide" transparent={true}>
+            <View className="flex-1 bg-black/60 justify-end">
+              <View className="bg-[#121212] rounded-t-3xl border-t border-white/10 px-6 pb-12 max-h-[80%]">
+                <View className="flex-row justify-between items-center py-6 border-b border-white/5 mb-2">
+                  <Text className="text-white text-xl font-bold">Select Category</Text>
+                  <TouchableOpacity onPress={() => setIsCategoryModalVisible(false)} className="p-2 bg-white/5 rounded-full">
+                    <Feather name="x" size={20} color="#A1A1AA" />
+                  </TouchableOpacity>
+                </View>
+                <FlatList
+                  data={categories}
+                  keyExtractor={(item) => item}
+                  showsVerticalScrollIndicator={false}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      className="flex-row justify-between items-center py-4 border-b border-white/5"
+                      onPress={() => {
+                        setStoreCategory(item);
+                        setIsCategoryModalVisible(false);
+                      }}
+                    >
+                      <Text className={`text-lg ${storeCategory === item ? 'text-[#0EA5E9] font-bold' : 'text-zinc-300'}`}>
+                        {item}
+                      </Text>
+                      {storeCategory === item && <Feather name="check-circle" size={20} color="#0EA5E9" />}
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            </View>
+          </Modal>
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 };
-
-const styles = StyleSheet.create({
-  screen: {
-    flex:1,
-    backgroundColor: '#09090B',
-  },
-  container: {
-    flex:1,
-    padding:24,
-  },
-  stepIndicator: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop:40,
-    paddingBottom:20,
-  },
-  stepDot: {
-    width:12,
-    height:12,
-    borderRadius:6,
-    backgroundColor: '#3f3f46',
-  },
-  stepDotActive: {
-    backgroundColor: '#0EA5E9',
-  },
-  title: {
-    fontSize:28,
-    fontWeight: 'bold',
-    color: '#FAFAFA',
-    marginBottom:8,
-  },
-  subtitle: {
-    fontSize:16,
-    color: '#A1A1AA',
-    marginBottom:32,
-  },
-  formGroup: {
-    marginBottom:20,
-  },
-  label: {
-    color: '#E4E4E7',
-    marginBottom:8,
-    fontSize:16,
-  },
-  input: {
-    backgroundColor: '#18181B',
-    borderWidth:1,
-    borderColor: '#3f3f46',
-    borderRadius:12,
-    paddingHorizontal:16,
-    paddingVertical:12,
-    color: '#FAFAFA',
-    fontSize:16,
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom:24,
-  },
-  checkbox: {
-    width:24,
-    height:24,
-    borderRadius:6,
-    borderWidth:2,
-    borderColor: '#3f3f46',
-    marginRight:12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxActive: {
-    backgroundColor: '#0EA5E9',
-    borderColor: '#0EA5E9',
-  },
-  checkboxLabel: {
-    color: '#E4E4E7',
-    fontSize:16,
-  },
-  button: {
-    backgroundColor: '#0EA5E9',
-    borderRadius:12,
-    paddingVertical:16,
-    alignItems: 'center',
-    marginTop:24,
-  },
-  buttonText: {
-    color: '#FAFAFA',
-    fontSize:16,
-    fontWeight: 'bold',
-  },
-});
 
 export default Onboarding;

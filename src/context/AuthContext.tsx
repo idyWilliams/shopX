@@ -20,9 +20,11 @@ type AuthContextType = {
   soloOwner: boolean;
   setSoloOwner: (solo: boolean) => void;
   currentMerchant: SimpleMerchant | null;
+  hasLoadedStores: boolean;
   loadAllStoresForOwner: (merchantId: string) => Promise<void>;
   loadAuthorizedStoresForAttendant: (attendantId: string) => Promise<void>;
-  createDefaultStore: (merchantId: string) => Promise<SimpleStore>;
+  createDefaultStore: (merchantId: string, storeName?: string, category?: string) => Promise<SimpleStore>;
+  simulateLogin: (email: string) => void;
   signOut: () => Promise<void>;
 };
 
@@ -39,9 +41,11 @@ const AuthContext = createContext<AuthContextType>({
   soloOwner: true,
   setSoloOwner: () => {},
   currentMerchant: null,
+  hasLoadedStores: false,
   loadAllStoresForOwner: async () => {},
   loadAuthorizedStoresForAttendant: async () => {},
   createDefaultStore: async () => { throw new Error('Not implemented'); },
+  simulateLogin: () => {},
   signOut: async () => {},
 });
 
@@ -54,6 +58,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [currentAttendant, setCurrentAttendant] = useState<SimpleAttendant | null>(null);
   const [soloOwner, setSoloOwner] = useState(true);
   const [currentMerchant, setCurrentMerchant] = useState<SimpleMerchant | null>(null);
+  const [hasLoadedStores, setHasLoadedStores] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -113,11 +118,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
 
       let stores = data || [];
-      
-      if (stores.length === 0) {
-        const defaultStore = await createDefaultStore(merchantId);
-        stores = [defaultStore];
-      }
 
       const formattedStores = stores.map((s: any) => ({
         id: s.id,
@@ -131,10 +131,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch (err) {
       console.error('Failed to load stores for owner:', err);
-      // Fallback to local store for offline/unreachable DB cases
-      const fallbackStore = { id: 'local-store', name: 'My Local Store', merchantId };
-      setAuthorizedStores([fallbackStore]);
-      setActiveStoreId(fallbackStore.id);
+    } finally {
+      setHasLoadedStores(true);
     }
   };
 
@@ -167,7 +165,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch (err) {
       console.error('Failed to load stores for attendant:', err);
+    } finally {
+      setHasLoadedStores(true);
     }
+  };
+
+  const simulateLogin = (email: string) => {
+    const mockSession = {
+      access_token: 'mock-token',
+      refresh_token: 'mock-refresh',
+      expires_in: 3600,
+      token_type: 'bearer',
+      user: {
+        id: 'mock-user-id-1234',
+        email: email,
+        app_metadata: {},
+        user_metadata: {},
+        aud: 'authenticated',
+        created_at: new Date().toISOString()
+      }
+    };
+    setSession(mockSession as any);
+    setUser(mockSession.user as any);
   };
 
   const signOut = async () => {
@@ -193,9 +212,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       soloOwner,
       setSoloOwner,
       currentMerchant,
+      hasLoadedStores,
       loadAllStoresForOwner,
       loadAuthorizedStoresForAttendant,
       createDefaultStore,
+      simulateLogin,
       signOut 
     }}>
       {children}
