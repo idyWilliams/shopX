@@ -6,10 +6,6 @@ module.exports = function (api) {
       ["babel-preset-expo", { jsxImportSource: "nativewind" }],
     ],
     plugins: [
-      // Decorators MUST come before class-properties.
-      // All three class-feature plugins must share the same 'loose' setting.
-      ["@babel/plugin-proposal-decorators", { legacy: true }],
-      ["@babel/plugin-proposal-class-properties", { loose: true }],
       "react-native-reanimated/plugin",
     ],
   };

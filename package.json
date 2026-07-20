@@ -1,7 +1,7 @@
 {
   "name": "shopx",
   "version": "1.0.0",
-  "main": "expo-router/entry",
+  "main": "./index.js",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -60,12 +60,6 @@
   },
   "private": true,
   "overrides": {
-    "react-native-webview": "^13.16.1",
-    "react-native-flutterwave": {
-      "react-native-webview": "^13.16.1"
-    },
-    "@use-africa-pay/react-native": {
-      "react-native-webview": "^13.16.1"
-    }
+    "react-native-webview": "^13.16.1"
   }
 }
