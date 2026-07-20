@@ -12,6 +12,8 @@ const Onboarding = () => {
   // Step 1: Store Setup
   const [merchantEmail, setMerchantEmail] = useState('');
   const [merchantPhone, setMerchantPhone] = useState('');
+  const [storeName, setStoreName] = useState('');
+  const [storeCategory, setStoreCategory] = useState('');
   const [isSoloOwner, setIsSoloOwner] = useState(false);
 
   const completeStep1 = async () => {
@@ -25,7 +27,7 @@ const Onboarding = () => {
 
   const completeSoloOwnerOnboarding = async () => {
     try {
-      const defaultStore = await createDefaultStore('temp-merchant-id');
+      const defaultStore = await createDefaultStore('temp-merchant-id', storeName, storeCategory);
 
       setSoloOwner(true);
       setActiveStoreId(defaultStore.id);
@@ -54,6 +56,28 @@ const Onboarding = () => {
           placeholderTextColor="#71717A"
           keyboardType="email-address"
           autoCapitalize="none"
+        />
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Store Name</Text>
+        <TextInput
+          style={styles.input}
+          value={storeName}
+          onChangeText={setStoreName}
+          placeholder="e.g. Ade's Provision Shop"
+          placeholderTextColor="#71717A"
+        />
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Store Category</Text>
+        <TextInput
+          style={styles.input}
+          value={storeCategory}
+          onChangeText={setStoreCategory}
+          placeholder="e.g. Retail, Electronics, Grocery"
+          placeholderTextColor="#71717A"
         />
       </View>
 

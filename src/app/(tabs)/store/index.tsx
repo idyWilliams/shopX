@@ -4,6 +4,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring } fr
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useAuth } from '../../../context/AuthContext';
 
 interface GridItem {
   id: string;
@@ -90,6 +91,9 @@ const WidgetCard = ({ title, children, onPress, wide = false }: { title: string;
 
 export default function StoreScreen() {
   const router = useRouter();
+  const { activeStoreId, authorizedStores } = useAuth();
+  const activeStore = authorizedStores.find(s => s.id === activeStoreId);
+  const storeName = activeStore?.name || 'My Business';
 
   const handlePress = (item: GridItem) => {
     router.push(item.screen);
@@ -99,7 +103,7 @@ export default function StoreScreen() {
     <View style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>My Business</Text>
+          <Text style={styles.headerTitle}>{storeName}</Text>
           <View style={styles.statusRow}>
             <View style={styles.statusDot} />
             <Text style={styles.statusText}>Active</Text>
@@ -251,7 +255,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingBottom: 110,
   },
   insightsTitle: {
     fontSize: 22,

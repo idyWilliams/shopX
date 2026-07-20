@@ -56,7 +56,7 @@ export default function SettingsScreen() {
   );
 
   return (
-    <ScrollView className="flex-1 bg-zinc-950">
+    <ScrollView className="flex-1 bg-zinc-950" contentContainerStyle={{ paddingBottom: 110 }}>
       <View className="border-b border-zinc-800 bg-zinc-950 px-4 py-4">
         <Text className="text-2xl font-bold text-zinc-50">Settings</Text>
         {user && (
@@ -109,7 +109,7 @@ export default function SettingsScreen() {
         </Text>
         <View className="rounded-2xl bg-zinc-900 mx-4 overflow-hidden border border-zinc-800">
           {renderSettingsItem(
-            'building',
+            'briefcase',
             organization?.name || 'Loading...',
             organization ? `${organization.tier.charAt(0).toUpperCase() + organization.tier.slice(1)} Plan` : ''
           )}

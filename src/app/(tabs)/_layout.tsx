@@ -15,10 +15,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <Feather name="shopping-cart" size={22} color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="register"
-        options={{ href: null }}
-      />
+
       <Tabs.Screen
         name="inventory"
         options={{

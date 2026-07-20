@@ -5,6 +5,7 @@ import { View, ActivityIndicator } from 'react-native';
 import '../styles/global.css';
 import { checkDeviceAuthorization } from '../lib/deviceGuard';
 import '../lib/config'; // Validate API keys on app start
+import { syncData } from '../lib/sync';
 import TerminalUnauthorizedScreen from '../components/TerminalUnauthorizedScreen';
 
 function RootLayoutNav() {
@@ -40,6 +41,13 @@ function RootLayoutNav() {
     };
 
     checkDevice();
+
+    // Start background sync every 5 minutes
+    const syncInterval = setInterval(() => {
+      syncData();
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(syncInterval);
   }, []);
 
   useEffect(() => {

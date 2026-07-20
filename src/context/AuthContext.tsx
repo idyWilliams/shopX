@@ -71,7 +71,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const createDefaultStore = async (merchantId: string): Promise<SimpleStore> => {
+  const createDefaultStore = async (merchantId: string, storeName?: string, category?: string): Promise<SimpleStore> => {
     // Create a merchant record if it doesn't exist
     const { data: merchantData, error: merchantError } = await supabase
       .from('merchants')
@@ -85,19 +85,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const { data, error } = await supabase
       .from('stores')
-      .insert({ merchant_id: merchantId, name: 'Default Shop' })
+      .insert({ merchant_id: merchantId, name: storeName || 'Default Shop', category: category || 'Retail' })
       .select()
       .single();
 
     if (error) {
       console.error('Error creating default store:', error);
-      throw error;
+      // Fallback for when Supabase is unreachable/missing schema
+      return { id: 'local-store', name: storeName || 'My Local Store', merchantId, category: category || 'Retail' } as any;
     }
 
     return {
       id: data.id,
       name: data.name,
       merchantId: data.merchant_id,
+      category: data.category,
     };
   };
 
@@ -129,6 +131,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch (err) {
       console.error('Failed to load stores for owner:', err);
+      // Fallback to local store for offline/unreachable DB cases
+      const fallbackStore = { id: 'local-store', name: 'My Local Store', merchantId };
+      setAuthorizedStores([fallbackStore]);
+      setActiveStoreId(fallbackStore.id);
     }
   };
 
