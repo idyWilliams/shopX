@@ -11,7 +11,7 @@ const Onboarding = () => {
 
   const [storeName, setStoreName] = useState('');
   const [storeLogo, setStoreLogo] = useState<string | null>(null);
-  const [storeCategory, setStoreCategory] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
   const [merchantEmail, setMerchantEmail] = useState('');
   const [merchantPhone, setMerchantPhone] = useState('');
@@ -48,7 +48,8 @@ const Onboarding = () => {
 
     setIsSubmitting(true);
     try {
-      const defaultStore = await createDefaultStore('temp-merchant-id', storeName, storeCategory, storeLogo || undefined);
+      const categoriesString = selectedCategories.join(', ');
+      const defaultStore = await createDefaultStore('temp-merchant-id', storeName, categoriesString, storeLogo || undefined);
 
       setSoloOwner(true);
       setActiveStoreId(defaultStore.id);
@@ -113,13 +114,13 @@ const Onboarding = () => {
 
 
             <Animated.View entering={FadeInDown.duration(600).delay(300).springify()} className="mb-6">
-              <Text className="text-zinc-300 font-semibold mb-2 ml-1 text-sm uppercase tracking-wider">Business Category</Text>
+              <Text className="text-zinc-300 font-semibold mb-2 ml-1 text-sm uppercase tracking-wider">Business Categories</Text>
               <TouchableOpacity
                 className="bg-white/5 border border-white/10 rounded-2xl px-5 py-4 flex-row justify-between items-center shadow-sm"
                 onPress={() => setIsCategoryModalVisible(true)}
               >
-                <Text className={`text-base ${storeCategory ? 'text-white font-medium' : 'text-zinc-500'}`}>
-                  {storeCategory || 'Select a Category'}
+                <Text className={`text-base ${selectedCategories.length > 0 ? 'text-white font-medium' : 'text-zinc-500'} flex-1 mr-2`} numberOfLines={1}>
+                  {selectedCategories.length > 0 ? selectedCategories.join(', ') : 'Select Categories'}
                 </Text>
                 <Feather name="chevron-down" size={20} color="#71717A" />
               </TouchableOpacity>
@@ -169,29 +170,37 @@ const Onboarding = () => {
             <View className="flex-1 bg-black/60 justify-end">
               <View className="bg-[#121212] rounded-t-3xl border-t border-white/10 px-6 pb-12 max-h-[80%]">
                 <View className="flex-row justify-between items-center py-6 border-b border-white/5 mb-2">
-                  <Text className="text-white text-xl font-bold">Select Category</Text>
-                  <TouchableOpacity onPress={() => setIsCategoryModalVisible(false)} className="p-2 bg-white/5 rounded-full">
-                    <Feather name="x" size={20} color="#A1A1AA" />
+                  <Text className="text-white text-xl font-bold">Select Categories</Text>
+                  <TouchableOpacity onPress={() => setIsCategoryModalVisible(false)} className="px-4 py-2 bg-[#0EA5E9]/20 rounded-full">
+                    <Text className="text-[#0EA5E9] font-bold">Done</Text>
                   </TouchableOpacity>
                 </View>
                 <FlatList
                   data={categories}
                   keyExtractor={(item) => item}
                   showsVerticalScrollIndicator={false}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      className="flex-row justify-between items-center py-4 border-b border-white/5"
-                      onPress={() => {
-                        setStoreCategory(item);
-                        setIsCategoryModalVisible(false);
-                      }}
-                    >
-                      <Text className={`text-lg ${storeCategory === item ? 'text-[#0EA5E9] font-bold' : 'text-zinc-300'}`}>
-                        {item}
-                      </Text>
-                      {storeCategory === item && <Feather name="check-circle" size={20} color="#0EA5E9" />}
-                    </TouchableOpacity>
-                  )}
+                  renderItem={({ item }) => {
+                    const isSelected = selectedCategories.includes(item);
+                    return (
+                      <TouchableOpacity
+                        className="flex-row justify-between items-center py-4 border-b border-white/5"
+                        onPress={() => {
+                          if (isSelected) {
+                            setSelectedCategories(prev => prev.filter(c => c !== item));
+                          } else {
+                            setSelectedCategories(prev => [...prev, item]);
+                          }
+                        }}
+                      >
+                        <Text className={`text-lg ${isSelected ? 'text-[#0EA5E9] font-bold' : 'text-zinc-300'}`}>
+                          {item}
+                        </Text>
+                        <View className={`h-6 w-6 rounded-md border items-center justify-center ${isSelected ? 'bg-[#0EA5E9] border-[#0EA5E9]' : 'border-zinc-500'}`}>
+                          {isSelected && <Feather name="check" size={16} color="white" />}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }}
                 />
               </View>
             </View>

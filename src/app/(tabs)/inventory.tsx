@@ -40,6 +40,10 @@ export default function InventoryScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const rates = useExchangeRates();
 
+  // Display Preferences
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
+
   // Modal State
   const [isModalVisible, setModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -48,6 +52,7 @@ export default function InventoryScreen() {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
+  const [category, setCategory] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
 
   const pickImage = async () => {
@@ -79,19 +84,23 @@ export default function InventoryScreen() {
     loadProducts();
   }, [activeStoreId]);
 
-  const { totalAssetValue, projectedRevenue, averageMargin } = useMemo(() => {
+  const { totalAssetValue, availableCategories } = useMemo(() => {
     let totalAsset = 0;
-    let totalRevenue = 0;
+    const catSet = new Set<string>();
     products.forEach((p) => {
       totalAsset += (p.costPrice || 0) * p.stockQuantity;
-      totalRevenue += p.sellingPrice * p.stockQuantity;
+      catSet.add(p.category || 'Uncategorized');
     });
-    let margin = 0;
-    if (totalRevenue > 0) {
-      margin = Math.round(((totalRevenue - totalAsset) / totalRevenue) * 100);
-    }
-    return { totalAssetValue: totalAsset, projectedRevenue: totalRevenue, averageMargin: margin };
+    return { 
+      totalAssetValue: totalAsset, 
+      availableCategories: ['All', ...Array.from(catSet).sort()]
+    };
   }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    if (selectedCategoryFilter === 'All') return products;
+    return products.filter(p => (p.category || 'Uncategorized') === selectedCategoryFilter);
+  }, [products, selectedCategoryFilter]);
 
   const handleSaveProduct = async () => {
     if (!name || !price || !stock) {
@@ -107,10 +116,11 @@ export default function InventoryScreen() {
             p.name = name;
             p.sellingPrice = parseFloat(price);
             p.stockQuantity = parseInt(stock, 10);
+            p.category = category || 'Uncategorized';
             if (imageUri) p.imageUrl = imageUri;
           });
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          Alert.alert('Price Updated', 'All attendants have been notified of the new price.');
+          Alert.alert('Product Updated', 'Changes pushed to the cloud.');
         } else {
           await database.get<Product>('products').create(p => {
             p.orgId = activeStoreId || 'default';
@@ -119,10 +129,11 @@ export default function InventoryScreen() {
             p.costPrice = parseFloat(price) * 0.7; // Dummy cost
             p.sellingPrice = parseFloat(price);
             p.stockQuantity = parseInt(stock, 10);
+            p.category = category || 'Uncategorized';
             if (imageUri) p.imageUrl = imageUri;
           });
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          Alert.alert('Product Created', 'New product is now live for all attendants.');
+          Alert.alert('Product Created', 'New product is now live.');
         }
       });
       
@@ -145,6 +156,7 @@ export default function InventoryScreen() {
     setName(product.name);
     setPrice(product.sellingPrice.toString());
     setStock(product.stockQuantity.toString());
+    setCategory(product.category || '');
     setImageUri(product.imageUrl || null);
     setModalVisible(true);
   };
@@ -154,6 +166,7 @@ export default function InventoryScreen() {
     setName('');
     setPrice('');
     setStock('');
+    setCategory('');
     setImageUri(null);
   };
 
@@ -163,7 +176,7 @@ export default function InventoryScreen() {
     return { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30' };
   };
 
-  const renderItem = ({ item }: { item: Product }) => {
+  const renderItemList = ({ item }: { item: Product }) => {
     const badgeStyle = getStockBadgeStyle(item.stockQuantity);
     const baseCurrency = item.baseCurrency || 'NGN';
     const sellingPriceUSD = calculateFX(item.sellingPrice, baseCurrency, 'USD', rates);
@@ -183,24 +196,60 @@ export default function InventoryScreen() {
           </View>
           <View className="flex-1">
             <View className="flex-row items-start justify-between">
-              <View>
-                <Text className="text-base font-bold text-zinc-50">{item.name}</Text>
+              <View className="flex-1 mr-2">
+                <Text className="text-base font-bold text-zinc-50" numberOfLines={2}>{item.name}</Text>
+                <Text className="text-xs font-semibold text-zinc-500 mt-1 uppercase tracking-wider">{item.category || 'Uncategorized'}</Text>
               </View>
-              <View className={`px-3 py-1 rounded-xl border ${badgeStyle.bg} ${badgeStyle.border}`}>
+              <View className={`px-2 py-1 rounded-xl border ${badgeStyle.bg} ${badgeStyle.border}`}>
                 <Text className={`text-xs font-bold ${badgeStyle.text}`}>
                   {item.stockQuantity <= 0 ? 'SOLD OUT' : `${item.stockQuantity} in stock`}
                 </Text>
               </View>
             </View>
-            <View className="mt-2">
-              <Text className="text-xl font-bold text-zinc-50">
-                {formatCurrency(item.sellingPrice, baseCurrency)}
-              </Text>
-              <Text className="text-xs text-zinc-400 mt-1">
-                ≈ {formatCurrency(sellingPriceUSD, 'USD')}
-              </Text>
+            <View className="mt-2 flex-row justify-between items-end">
+              <View>
+                <Text className="text-lg font-bold text-zinc-50">
+                  {formatCurrency(item.sellingPrice, baseCurrency)}
+                </Text>
+                <Text className="text-xs text-zinc-400 mt-0.5">
+                  ≈ {formatCurrency(sellingPriceUSD, 'USD')}
+                </Text>
+              </View>
+              <Feather name="edit-2" size={16} color="#71717a" />
             </View>
           </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderItemGrid = ({ item }: { item: Product }) => {
+    const badgeStyle = getStockBadgeStyle(item.stockQuantity);
+    const baseCurrency = item.baseCurrency || 'NGN';
+
+    return (
+      <TouchableOpacity
+        className="mb-4 rounded-3xl bg-zinc-900 border border-zinc-800 p-4 active:opacity-90 flex-1 mx-2"
+        onPress={() => openEditModal(item)}
+      >
+        <View className="h-24 w-full items-center justify-center rounded-2xl bg-zinc-800 overflow-hidden mb-3">
+          {item.imageUrl ? (
+            <Image source={{ uri: item.imageUrl }} style={{ width: '100%', height: '100%' }} />
+          ) : (
+            <Feather name="box" size={32} color="#71717A" />
+          )}
+        </View>
+        <View className={`px-2 py-1 rounded-lg border self-start mb-2 ${badgeStyle.bg} ${badgeStyle.border}`}>
+          <Text className={`text-[10px] font-bold ${badgeStyle.text}`}>
+            {item.stockQuantity <= 0 ? 'SOLD OUT' : `${item.stockQuantity} qty`}
+          </Text>
+        </View>
+        <Text className="text-sm font-bold text-zinc-50 mb-1" numberOfLines={2}>{item.name}</Text>
+        <Text className="text-xs font-semibold text-zinc-500 mb-2 uppercase tracking-wider" numberOfLines={1}>{item.category || 'Uncategorized'}</Text>
+        <View className="flex-row justify-between items-center mt-auto">
+          <Text className="text-base font-bold text-[#0ea5e9]">
+            {formatCurrency(item.sellingPrice, baseCurrency)}
+          </Text>
         </View>
       </TouchableOpacity>
     );
@@ -218,42 +267,62 @@ export default function InventoryScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#09090b' }} edges={['top']}>
       {/* Header */}
-      <View className="px-4 pt-4 pb-6 flex-row justify-between items-center">
-        <Text className="text-2xl font-bold text-zinc-50">Inventory</Text>
-        <TouchableOpacity 
-          className="bg-[#0ea5e9] p-3 rounded-full"
-          onPress={openAddModal}
-        >
-          <Feather name="plus" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-
-      {/* FX Ledger Widget */}
-      <View className="px-4 mb-6">
-        <View className="rounded-3xl bg-gradient-to-br from-cyan-500/10 to-emerald-500/10 border border-cyan-500/20 p-6">
-          <View className="flex-row items-center gap-2 mb-4">
-            <Feather name="trending-up" size={20} color="#06B6D4" />
-            <Text className="text-sm font-semibold text-cyan-400">Business Health</Text>
-          </View>
-          <Text className="text-xs text-zinc-400 mb-1">Total Asset Value</Text>
-          <Text className="text-3xl font-bold text-zinc-50">{formatCurrency(totalAssetValue, 'NGN')}</Text>
+      <View className="px-6 pt-4 pb-4 border-b border-white/5 flex-row justify-between items-center">
+        <Text className="text-3xl font-extrabold text-white tracking-tight">Inventory</Text>
+        <View className="flex-row gap-3">
+          <TouchableOpacity 
+            className="bg-white/10 p-3 rounded-full h-12 w-12 items-center justify-center"
+            onPress={() => setViewMode(prev => prev === 'list' ? 'grid' : 'list')}
+          >
+            <Feather name={viewMode === 'list' ? 'grid' : 'list'} size={20} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            className="bg-[#0ea5e9] p-3 rounded-full h-12 w-12 items-center justify-center shadow-lg shadow-sky-500/30"
+            onPress={openAddModal}
+          >
+            <Feather name="plus" size={24} color="#fff" />
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Product List */}
+      {/* Category Filter */}
+      <View>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          className="py-4"
+          contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+        >
+          {availableCategories.map(cat => (
+            <TouchableOpacity 
+              key={cat}
+              onPress={() => setSelectedCategoryFilter(cat)}
+              className={`px-4 py-2 rounded-full border ${selectedCategoryFilter === cat ? 'bg-[#0ea5e9] border-[#0ea5e9]' : 'bg-white/5 border-white/10'}`}
+            >
+              <Text className={`font-semibold ${selectedCategoryFilter === cat ? 'text-white' : 'text-zinc-400'}`}>
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Product List/Grid */}
       <FlatList
-        data={products}
-        renderItem={renderItem}
+        key={viewMode}
+        data={filteredProducts}
+        renderItem={viewMode === 'list' ? renderItemList : renderItemGrid}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 110 }}
+        numColumns={viewMode === 'grid' ? 2 : 1}
+        contentContainerStyle={{ paddingBottom: 110, paddingHorizontal: viewMode === 'grid' ? 8 : 0 }}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View className="items-center justify-center py-20 px-8">
             <View className="h-24 w-24 items-center justify-center rounded-3xl bg-zinc-800 border border-zinc-700 mb-6">
               <Feather name="package" size={48} color="#71717A" />
             </View>
-            <Text className="text-xl font-bold text-zinc-50 mb-2 text-center">No products yet</Text>
-            <Text className="text-zinc-400 text-center mb-8">Tap the + button to add products.</Text>
+            <Text className="text-xl font-bold text-zinc-50 mb-2 text-center">No products found</Text>
+            <Text className="text-zinc-400 text-center mb-8">Tap the + button to add products to this category.</Text>
           </View>
         }
       />
@@ -263,12 +332,12 @@ export default function InventoryScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 bg-zinc-950">
           <View className="flex-row justify-between items-center p-6 border-b border-zinc-800">
             <Text className="text-2xl font-bold text-white">{editingProduct ? 'Edit Product' : 'New Product'}</Text>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Feather name="x" size={28} color="#a1a1aa" />
+            <TouchableOpacity onPress={() => setModalVisible(false)} className="bg-white/10 p-2 rounded-full">
+              <Feather name="x" size={24} color="#a1a1aa" />
             </TouchableOpacity>
           </View>
           <ScrollView className="p-6">
-            <View className="items-center mb-6">
+            <View className="items-center mb-8">
               <TouchableOpacity 
                 onPress={pickImage}
                 className="h-32 w-32 bg-zinc-900 border border-zinc-800 rounded-3xl items-center justify-center overflow-hidden"
@@ -284,37 +353,51 @@ export default function InventoryScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text className="text-zinc-400 mb-2 text-base">Product Name</Text>
+            <Text className="text-zinc-400 mb-2 text-sm uppercase tracking-wider font-semibold ml-1">Product Name</Text>
             <TextInput
-              className="bg-zinc-900 border border-zinc-800 text-white rounded-xl p-4 mb-6 text-lg"
+              className="bg-zinc-900 border border-zinc-800 text-white rounded-2xl p-4 mb-6 text-lg"
               placeholder="e.g. Coca-Cola 50cl"
               placeholderTextColor="#52525b"
               value={name}
               onChangeText={setName}
             />
             
-            <Text className="text-zinc-400 mb-2 text-base">Selling Price (NGN)</Text>
-            <TextInput
-              className="bg-zinc-900 border border-zinc-800 text-white rounded-xl p-4 mb-6 text-lg"
-              placeholder="0.00"
-              placeholderTextColor="#52525b"
-              keyboardType="decimal-pad"
-              value={price}
-              onChangeText={setPrice}
-            />
+            <View className="flex-row gap-4 mb-6">
+              <View className="flex-1">
+                <Text className="text-zinc-400 mb-2 text-sm uppercase tracking-wider font-semibold ml-1">Selling Price (₦)</Text>
+                <TextInput
+                  className="bg-zinc-900 border border-zinc-800 text-white rounded-2xl p-4 text-lg"
+                  placeholder="0.00"
+                  placeholderTextColor="#52525b"
+                  keyboardType="decimal-pad"
+                  value={price}
+                  onChangeText={setPrice}
+                />
+              </View>
+              <View className="flex-1">
+                <Text className="text-zinc-400 mb-2 text-sm uppercase tracking-wider font-semibold ml-1">Stock Quantity</Text>
+                <TextInput
+                  className="bg-zinc-900 border border-zinc-800 text-white rounded-2xl p-4 text-lg"
+                  placeholder="e.g. 50"
+                  placeholderTextColor="#52525b"
+                  keyboardType="number-pad"
+                  value={stock}
+                  onChangeText={setStock}
+                />
+              </View>
+            </View>
 
-            <Text className="text-zinc-400 mb-2 text-base">Stock Quantity</Text>
+            <Text className="text-zinc-400 mb-2 text-sm uppercase tracking-wider font-semibold ml-1">Category</Text>
             <TextInput
-              className="bg-zinc-900 border border-zinc-800 text-white rounded-xl p-4 mb-10 text-lg"
-              placeholder="e.g. 50"
+              className="bg-zinc-900 border border-zinc-800 text-white rounded-2xl p-4 mb-10 text-lg"
+              placeholder="e.g. Drinks, Snacks, Electronics"
               placeholderTextColor="#52525b"
-              keyboardType="number-pad"
-              value={stock}
-              onChangeText={setStock}
+              value={category}
+              onChangeText={setCategory}
             />
 
             <TouchableOpacity 
-              className="bg-[#0ea5e9] py-4 rounded-xl items-center"
+              className="bg-[#0ea5e9] py-4 rounded-2xl items-center shadow-lg shadow-sky-500/30"
               onPress={handleSaveProduct}
             >
               <Text className="text-white font-bold text-lg">Save Product</Text>
@@ -322,6 +405,7 @@ export default function InventoryScreen() {
             <Text className="text-zinc-500 text-center mt-4 px-4 text-sm">
               Any changes saved here will immediately push to the cloud and notify all attendants.
             </Text>
+            <View className="h-20" />
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
