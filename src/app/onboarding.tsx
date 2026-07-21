@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 const Onboarding = () => {
-  const { setActiveStoreId, setAuthorizedStores, setSoloOwner, createDefaultStore } = useAuth();
+  const { setActiveStoreId, setAuthorizedStores, setSoloOwner, createDefaultStore, setHasCompletedOnboarding } = useAuth();
 
   const [storeName, setStoreName] = useState('');
   const [storeLogo, setStoreLogo] = useState<string | null>(null);
@@ -17,6 +17,7 @@ const Onboarding = () => {
   const [merchantPhone, setMerchantPhone] = useState('');
   const [isSoloOwner, setIsSoloOwner] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const categories = [
     'Retail', 'Electronics', 'Grocery', 'Fashion & Apparel',
@@ -54,8 +55,11 @@ const Onboarding = () => {
       setSoloOwner(true);
       setActiveStoreId(defaultStore.id);
       setAuthorizedStores([defaultStore]);
-
-      router.replace('/(tabs)');
+      await setHasCompletedOnboarding(true);
+      
+      // Show success modal with confetti (confetti temporarily removed for web compatibility)
+      setShowSuccessModal(true);
+      
     } catch (error) {
       console.error(error);
       Alert.alert('Error', 'Failed to complete setup');
@@ -202,6 +206,28 @@ const Onboarding = () => {
                     );
                   }}
                 />
+              </View>
+            </View>
+          </Modal>
+
+          {/* Success Modal */}
+          <Modal visible={showSuccessModal} animationType="fade" transparent={true}>
+            <View className="flex-1 bg-black/80 justify-center items-center p-6">
+              <View className="bg-[#121212] rounded-3xl border border-white/10 p-8 w-full max-w-sm">
+                <View className="w-20 h-20 bg-emerald-500 rounded-full items-center justify-center mb-6 mx-auto">
+                  <Feather name="check" size={40} color="white" />
+                </View>
+                <Text className="text-white text-2xl font-extrabold text-center mb-3">Congratulations!</Text>
+                <Text className="text-zinc-400 text-center mb-8">Welcome to ShopX! Let's start selling!</Text>
+                <TouchableOpacity
+                  className="bg-[#0EA5E9] rounded-2xl h-14 items-center justify-center"
+                  onPress={() => {
+                    setShowSuccessModal(false);
+                    router.replace('/(tabs)');
+                  }}
+                >
+                  <Text className="text-white font-bold text-lg">Let's Go!</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </Modal>

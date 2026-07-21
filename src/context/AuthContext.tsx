@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Simplified types for disabled WatermelonDB
 type SimpleStore = { id: string; name: string; merchantId: string; locationAddress?: string };
@@ -21,6 +22,8 @@ type AuthContextType = {
   setSoloOwner: (solo: boolean) => void;
   currentMerchant: SimpleMerchant | null;
   hasLoadedStores: boolean;
+  hasCompletedOnboarding: boolean;
+  setHasCompletedOnboarding: (completed: boolean) => Promise<void>;
   loadAllStoresForOwner: (merchantId: string) => Promise<void>;
   loadAuthorizedStoresForAttendant: (attendantId: string) => Promise<void>;
   createDefaultStore: (merchantId: string, storeName?: string, category?: string) => Promise<SimpleStore>;
@@ -42,6 +45,8 @@ const AuthContext = createContext<AuthContextType>({
   setSoloOwner: () => {},
   currentMerchant: null,
   hasLoadedStores: false,
+  hasCompletedOnboarding: false,
+  setHasCompletedOnboarding: async () => {},
   loadAllStoresForOwner: async () => {},
   loadAuthorizedStoresForAttendant: async () => {},
   createDefaultStore: async () => { throw new Error('Not implemented'); },
@@ -59,8 +64,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [soloOwner, setSoloOwner] = useState(true);
   const [currentMerchant, setCurrentMerchant] = useState<SimpleMerchant | null>(null);
   const [hasLoadedStores, setHasLoadedStores] = useState(false);
+  const [hasCompletedOnboarding, setHasCompletedOnboardingState] = useState(false);
+
+  const setHasCompletedOnboarding = async (completed: boolean) => {
+    try {
+      if (completed) {
+        await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
+      } else {
+        await AsyncStorage.removeItem('hasCompletedOnboarding');
+      }
+      setHasCompletedOnboardingState(completed);
+    } catch (err) {
+      console.error('Failed to update onboarding state:', err);
+    }
+  };
+
+  const loadOnboardingState = async () => {
+    try {
+      const value = await AsyncStorage.getItem('hasCompletedOnboarding');
+      setHasCompletedOnboardingState(value === 'true');
+    } catch (err) {
+      console.error('Failed to load onboarding state:', err);
+    }
+  };
 
   useEffect(() => {
+    loadOnboardingState();
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -131,6 +160,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     } catch (err) {
       console.error('Failed to load stores for owner:', err);
+      // Fallback to dummy stores if Supabase fails
+      const dummyStores = [
+        { id: 'dummy-store-1', name: 'My Shop', merchantId: merchantId },
+      ];
+      setAuthorizedStores(dummyStores);
+      setActiveStoreId(dummyStores[0].id);
     } finally {
       setHasLoadedStores(true);
     }
@@ -213,6 +248,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSoloOwner,
       currentMerchant,
       hasLoadedStores,
+      hasCompletedOnboarding,
+      setHasCompletedOnboarding,
       loadAllStoresForOwner,
       loadAuthorizedStoresForAttendant,
       createDefaultStore,

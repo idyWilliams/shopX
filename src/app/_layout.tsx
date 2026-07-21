@@ -18,12 +18,13 @@ function RootLayoutNav() {
     currentAttendant, 
     soloOwner,
     hasLoadedStores,
+    hasCompletedOnboarding,
     loadAllStoresForOwner,
     setActiveStoreId,
     setAuthorizedStores,
     setSoloOwner
   } = useAuth();
-  const { activeShift, isLoadingShift } = useShift();
+  const { activeShift, isLoadingShift, openShift } = useShift();
   const segments = useSegments();
   const router = useRouter();
   const [deviceChecked, setDeviceChecked] = useState<boolean>(false);
@@ -73,7 +74,7 @@ function RootLayoutNav() {
 
       if (inAuthGroup || inWelcome) {
         if (soloOwner) {
-          if (authorizedStores.length === 0) {
+          if (authorizedStores.length === 0 || !hasCompletedOnboarding) {
             router.replace('/onboarding');
           } else {
             router.replace('/(tabs)');
@@ -91,15 +92,17 @@ function RootLayoutNav() {
         }
       } else if (!inSelectShopGroup && !inOnboarding && !activeStoreId && authorizedStores.length > 1 && !soloOwner) {
         router.replace('/select-shop');
-      } else if (soloOwner && authorizedStores.length === 0 && !inOnboarding) {
-        // If they navigate away from onboarding without stores, push them back
+      } else if (soloOwner && (authorizedStores.length === 0 || !hasCompletedOnboarding) && !inOnboarding) {
+        // If they navigate away from onboarding without stores or haven't completed onboarding, push them back
         router.replace('/onboarding');
-      } else if (activeStoreId && !activeShift && !inOpenShift) {
-        // If there's an active store but no open shift, require opening one first
-        router.replace('/open-shift');
       }
+      // For now, we'll skip requiring shift opening for a smoother experience
+      // else if (activeStoreId && !activeShift && !inOpenShift) {
+      //   // If there's an active store but no open shift, require opening one first
+      //   router.replace('/open-shift');
+      // }
     }
-  }, [session, loading, segments, deviceChecked, activeStoreId, authorizedStores, soloOwner, hasLoadedStores, activeShift, isLoadingShift]);
+  }, [session, loading, segments, deviceChecked, activeStoreId, authorizedStores, soloOwner, hasLoadedStores, hasCompletedOnboarding, activeShift, isLoadingShift]);
 
   if (loading || !deviceChecked) {
     return (
