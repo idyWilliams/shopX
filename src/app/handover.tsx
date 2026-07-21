@@ -10,10 +10,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { usePermissions } from '../hooks/security';
-import type { ActivityFeed, Location } from '../types';
+import { useShift } from '../context/ShiftContext';
+import { closeShift } from '../services/ShiftService';
+import { database } from '../db';
+import { SalesEvent } from '../db/models/SalesEvent';
 
 const formatCurrency = (amount: number): string => {
   if (isNaN(amount)) {
@@ -29,8 +30,8 @@ const parseCurrencyInput = (text: string): number => {
 
 export default function HandoverScreen() {
   const router = useRouter();
-  const { user } = useAuth();
-  const { profile, isLoading: permissionsLoading } = usePermissions();
+  const { activeStoreId } = useAuth();
+  const { activeShift } = useShift();
   const [declaredCash, setDeclaredCash] = useState('');
   const [declaredTransfers, setDeclaredTransfers] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,14 +40,13 @@ export default function HandoverScreen() {
   const [variance, setVariance] = useState(0);
   const [expectedCash, setExpectedCash] = useState(0);
   const [expectedTransfers, setExpectedTransfers] = useState(0);
-  const [activities, setActivities] = useState<ActivityFeed[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
 
-  // Fetch today's activities and locations
+  // Fetch today's sales events from WatermelonDB
   useEffect(() => {
-    const fetchTodayActivities = async () => {
+    const fetchTodaySales = async () => {
       try {
         setIsLoading(true);
+        if (!activeStoreId) return;
 
         // Get today's date range
         const today = new Date();
@@ -54,53 +54,42 @@ export default function HandoverScreen() {
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        const [activitiesRes, locationsRes] = await Promise.all([
-          supabase.from('activities').select('*')
-            .eq('type', 'sale')
-            .gte('timestamp', today.toISOString())
-            .lt('timestamp', tomorrow.toISOString()),
-          supabase.from('locations').select('*')
-        ]);
+        // Get all sales events from today
+        const allSalesEvents = await database.get<SalesEvent>('sales_events').query().fetch();
+        
+        // Filter to today's sales (and only include those from active shift if available)
+        const todaysSales = allSalesEvents.filter(event => {
+          const eventDate = new Date(event.createdAt);
+          const isToday = eventDate >= today && eventDate < tomorrow;
+          const isCurrentShift = activeShift ? event.shiftId === activeShift.id : true;
+          return isToday && isCurrentShift;
+        });
 
-        if (activitiesRes.error) throw activitiesRes.error;
-        if (locationsRes.error) throw locationsRes.error;
-
-        const salesData = activitiesRes.data || [];
-        const cashTotal = salesData.reduce((sum, act) => {
-          if (act.payment_method === 'cash') {
-            return sum + (act.total_amount || 0);
-          }
-          return sum;
+        // For now, assume all sales are cash (we'll track payment methods later)
+        const totalSales = todaysSales.reduce((sum, event) => {
+          return sum + (event.priceAtSale * event.quantity);
         }, 0);
         
-        const transferTotal = salesData.reduce((sum, act) => {
-          if (act.payment_method === 'transfer') {
-            return sum + (act.total_amount || 0);
-          }
-          return sum;
-        }, 0);
-        
-        setExpectedCash(cashTotal);
-        setExpectedTransfers(transferTotal);
-        setActivities(salesData);
-        setLocations(locationsRes.data || []);
+        // For now, set all to cash; we'll improve this when we track payment methods
+        setExpectedCash(totalSales);
+        setExpectedTransfers(0);
       } catch (error: any) {
-        console.error('Error fetching today\'s activities:', error);
+        console.error('Error fetching today\'s sales:', error);
         Alert.alert('Error', error.message || 'Failed to load shift data');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchTodayActivities();
-  }, []);
+    fetchTodaySales();
+  }, [activeStoreId, activeShift]);
 
   const totalExpected = expectedCash + expectedTransfers;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    try {
       const cash = parseCurrencyInput(declaredCash);
       const transfers = parseCurrencyInput(declaredTransfers);
       const totalDeclared = cash + transfers;
@@ -108,24 +97,37 @@ export default function HandoverScreen() {
 
       setVariance(calculatedVariance);
 
-      if (calculatedVariance >= 0) {
+      if (!activeStoreId || !activeShift) {
+        throw new Error('No active store or shift');
+      }
+
+      await closeShift(
+        activeShift.id,
+        activeStoreId,
+        cash,
+        transfers,
+        expectedCash,
+        expectedTransfers
+      );
+
+      if (calculatedVariance === 0) {
         setResult('success');
       } else {
         setResult('discrepancy');
       }
-
+    } catch (error: any) {
+      console.error('Error closing shift:', error);
+      Alert.alert('Error', error.message || 'Failed to close shift');
+    } finally {
       setIsSubmitting(false);
-    }, 1500);
+    }
   };
 
   const handleReset = () => {
-    setDeclaredCash('');
-    setDeclaredTransfers('');
-    setResult(null);
-    setVariance(0);
+    router.replace('/open-shift');
   };
 
-  if (isLoading || permissionsLoading) {
+  if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-zinc-950">
         <ActivityIndicator size="large" color="#06B6D4" />
@@ -134,8 +136,8 @@ export default function HandoverScreen() {
     );
   }
 
-  // Get the location name (default to first location or "Shop Location")
-  const currentLocation = locations[0]?.name || "Shop Location";
+  // Get the location name
+  const currentLocation = "Shop Location";
 
   if (result) {
     return (

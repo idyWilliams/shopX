@@ -94,6 +94,12 @@ export default function SettingsScreen() {
             () => router.push('/settings/activity')
           )}
           {renderSettingsItem(
+            'clock',
+            'Shift History',
+            'View past shifts',
+            () => router.push('/settings/shifts')
+          )}
+          {renderSettingsItem(
             'bell',
             'Alerts',
             'Stale stock, traffic alerts',

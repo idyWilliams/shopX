@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../../context/AuthContext';
+import { useDailyDigest } from '../../../hooks/useDailyDigest';
+
+const formatCurrency = (amount: number): string => {
+  if (isNaN(amount)) {
+    return '₦0';
+  }
+  return `₦${amount.toLocaleString()}`;
+};
 
 interface GridItem {
   id: string;
@@ -18,6 +26,7 @@ interface GridItem {
 const GRID_ITEMS: GridItem[] = [
   { id: 'lens', title: 'ShopX Lens', icon: 'camera', color: '#0EA5E9', screen: '/lens' },
   { id: 'alerts', title: 'Alerts & Notifications', icon: 'bell', color: '#EF4444', screen: '/settings/alerts', badge: 3 },
+  { id: 'transfers', title: 'Pending Transfers', icon: 'dollar-sign', color: '#10B981', screen: '/store/pending-transfers' },
   { id: 'leads', title: 'Leads Tracker', icon: 'users', color: '#8B5CF6', screen: '/store/leads' },
   { id: 'staff', title: 'Staff & Attendants', icon: 'user-check', color: '#10B981', screen: '/settings/team' },
   { id: 'settings', title: 'Business Settings', icon: 'settings', color: '#6B7280', screen: '/settings' },
@@ -92,6 +101,7 @@ const WidgetCard = ({ title, children, onPress, wide = false }: { title: string;
 export default function StoreScreen() {
   const router = useRouter();
   const { activeStoreId, authorizedStores } = useAuth();
+  const { digest, isLoading: digestLoading } = useDailyDigest();
   const activeStore = authorizedStores.find(s => s.id === activeStoreId);
   const storeName = activeStore?.name || 'My Business';
 
@@ -111,6 +121,52 @@ export default function StoreScreen() {
         </View>
 
         <Animated.ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* --- Daily Digest Section */}
+          <Text style={styles.insightsTitle}>Daily Digest</Text>
+          <WidgetCard title="Today's Summary" wide>
+            {digestLoading ? (
+              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+                <ActivityIndicator size="large" color="#0EA5E9" />
+              </View>
+            ) : digest ? (
+              <View style={{ gap: 16 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <View>
+                    <Text style={{ fontSize: 12, color: '#8E8E93', fontWeight: '500' }}>Total Sales</Text>
+                    <Text style={{ fontSize: 28, fontWeight: '800', color: '#000000' }}>
+                      {formatCurrency(digest.totalSalesAmount)}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 12, color: '#8E8E93', fontWeight: '500' }}>Transactions</Text>
+                    <Text style={{ fontSize: 28, fontWeight: '800', color: '#000000' }}>
+                      {digest.numberOfTransactions}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1, backgroundColor: '#E5E7EB', borderRadius: 12, padding: 12 }}>
+                    <Text style={{ fontSize: 12, color: '#4B5563', fontWeight: '500' }}>Shifts</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#10B981' }}>
+                        {digest.shifts.clean} Clean
+                      </Text>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#EF4444' }}>
+                        {digest.shifts.discrepancyLocked} Issues
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            ) : (
+              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+                <Feather name="bar-chart-2" size={32} color="#3f3f46" />
+                <Text style={{ color: '#71717a', marginTop: 8, fontSize: 14 }}>No data yet</Text>
+              </View>
+            )}
+          </WidgetCard>
+
           {/* --- Demand & Web Insights Section */}
           <Text style={styles.insightsTitle}>Demand & Web Insights</Text>
 

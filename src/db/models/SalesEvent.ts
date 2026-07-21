@@ -11,6 +11,7 @@ export class SalesEvent extends Model {
   @field('price_at_sale') priceAtSale!: number
   @field('event_type') eventType!: string
   @field('attendant_id') attendantId?: string
+  @field('shift_id') shiftId?: string // Added shift_id
   
   @readonly @date('created_at') createdAt!: Date
 }

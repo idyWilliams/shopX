@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb'
 
 export const schema = appSchema({
-  version: 1,
+  version: 2, // Incremented schema version
   tables: [
     tableSchema({
       name: 'sales_events',
@@ -13,7 +13,33 @@ export const schema = appSchema({
         { name: 'price_at_sale', type: 'number' },
         { name: 'event_type', type: 'string' },
         { name: 'attendant_id', type: 'string', isOptional: true },
+        { name: 'shift_id', type: 'string', isOptional: true }, // Added shift_id
         { name: 'created_at', type: 'number' },
+      ]
+    }),
+    tableSchema({
+      name: 'shifts',
+      columns: [
+        { name: 'store_id', type: 'string' },
+        { name: 'attendant_id', type: 'string', isOptional: true },
+        { name: 'opened_at', type: 'number' },
+        { name: 'closed_at', type: 'number', isOptional: true },
+        { name: 'opening_cash_float', type: 'number' },
+        { name: 'status', type: 'string' },
+        { name: 'created_at', type: 'number' },
+      ]
+    }),
+    tableSchema({
+      name: 'pending_transfers',
+      columns: [
+        { name: 'store_id', type: 'string' },
+        { name: 'ticket_id', type: 'string', isOptional: true },
+        { name: 'sale_id', type: 'string', isOptional: true },
+        { name: 'amount', type: 'number' },
+        { name: 'currency', type: 'string' },
+        { name: 'status', type: 'string' },
+        { name: 'created_at', type: 'number' },
+        { name: 'confirmed_at', type: 'number', isOptional: true },
       ]
     }),
     tableSchema({

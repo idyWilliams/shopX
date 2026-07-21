@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { ShiftProvider, useShift } from '../context/ShiftContext';
 import { View, ActivityIndicator } from 'react-native';
 import '../styles/global.css';
 import { checkDeviceAuthorization } from '../lib/deviceGuard';
@@ -22,6 +23,7 @@ function RootLayoutNav() {
     setAuthorizedStores,
     setSoloOwner
   } = useAuth();
+  const { activeShift, isLoadingShift } = useShift();
   const segments = useSegments();
   const router = useRouter();
   const [deviceChecked, setDeviceChecked] = useState<boolean>(false);
@@ -52,12 +54,13 @@ function RootLayoutNav() {
   }, []);
 
   useEffect(() => {
-    if (loading || !deviceChecked) return;
+    if (loading || !deviceChecked || isLoadingShift) return;
 
     const inWelcome = segments[0] === 'welcome';
     const inAuthGroup = segments[0] === 'auth';
     const inSelectShopGroup = segments[0] === 'select-shop';
     const inOnboarding = segments[0] === 'onboarding';
+    const inOpenShift = segments[0] === 'open-shift';
 
     if (!session && !inAuthGroup && !inOnboarding && !inWelcome) {
       router.replace('/welcome');
@@ -91,9 +94,12 @@ function RootLayoutNav() {
       } else if (soloOwner && authorizedStores.length === 0 && !inOnboarding) {
         // If they navigate away from onboarding without stores, push them back
         router.replace('/onboarding');
+      } else if (activeStoreId && !activeShift && !inOpenShift) {
+        // If there's an active store but no open shift, require opening one first
+        router.replace('/open-shift');
       }
     }
-  }, [session, loading, segments, deviceChecked, activeStoreId, authorizedStores, soloOwner, hasLoadedStores]);
+  }, [session, loading, segments, deviceChecked, activeStoreId, authorizedStores, soloOwner, hasLoadedStores, activeShift, isLoadingShift]);
 
   if (loading || !deviceChecked) {
     return (
@@ -115,7 +121,9 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootLayoutNav />
+      <ShiftProvider>
+        <RootLayoutNav />
+      </ShiftProvider>
     </AuthProvider>
   );
 }

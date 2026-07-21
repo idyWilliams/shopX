@@ -5,10 +5,12 @@ import { Feather } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, FadeInDown, FadeInUp, FadeOutDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../context/AuthContext';
+import { useShift } from '../../context/ShiftContext';
 import { syncData } from '../../lib/sync';
 import { database } from '../../db';
 import { Product } from '../../db/models/Product';
 import { SalesEvent } from '../../db/models/SalesEvent';
+import { createPendingTransfer } from '../../services/PendingTransferService';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -19,6 +21,7 @@ type CartItem = {
 
 export default function RegisterScreen() {
   const { activeStoreId } = useAuth();
+  const { activeShift } = useShift();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   
@@ -97,16 +100,21 @@ export default function RegisterScreen() {
     isSheetOpen.value = false;
     
     if (!activeStoreId) return;
+    const ticketId = Math.random().toString(36).substr(2, 9).toUpperCase();
+    const saleTotal = cartTotalAmount;
 
     try {
       await database.write(async () => {
+        // Create sales events for each item
         for (const item of cart) {
           await database.get<SalesEvent>('sales_events').create(event => {
             event.storeId = activeStoreId;
+            event.ticketId = ticketId;
             event.productId = item.product.id;
             event.quantity = item.quantity;
             event.priceAtSale = item.product.sellingPrice;
             event.eventType = 'sale';
+            event.shiftId = activeShift?.id; // Associate with active shift
           });
           
           const productToUpdate = await database.get<Product>('products').find(item.product.id);
@@ -115,6 +123,17 @@ export default function RegisterScreen() {
           });
         }
       });
+
+      // If payment method is transfer, create a pending transfer
+      if (method === 'transfer') {
+        await createPendingTransfer(
+          activeStoreId, 
+          ticketId, 
+          null, 
+          saleTotal, 
+          'NGN'
+        );
+      }
       
       const allProducts = await database.get<Product>('products').query().fetch();
       setProducts(allProducts);

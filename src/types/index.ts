@@ -2,6 +2,10 @@ export type OrganizationTier = 'free' | 'premium';
 export type UserRole = 'owner' | 'manager' | 'assistant';
 export type ActivityType = 'sale' | 'restock' | 'transfer' | 'anomaly';
 
+export type ShiftStatus = 'open' | 'clean' | 'discrepancy_locked';
+export type CashDrawerEventType = 'OPENING' | 'CLOSING' | 'DROP';
+export type PendingTransferStatus = 'initiated' | 'confirmed' | 'failed';
+
 export interface Organization {
   id: string;
   name: string;
@@ -79,14 +83,49 @@ export interface ChatMessage {
 
 export interface Shift {
   id: string;
-  location_id: string;
-  declared_cash: number;
-  declared_transfers: number;
-  expected_cash: number;
-  expected_transfers: number;
-  status: 'pending' | 'matched' | 'discrepancy';
-  created_by: string | null;
-  created_at: string;
+  store_id: string;
+  attendant_id: string | null;
+  opened_at: Date;
+  closed_at: Date | null;
+  opening_cash_float: number;
+  status: ShiftStatus;
+}
+
+export interface CashDrawerLog {
+  id: string;
+  store_id: string;
+  shift_id: string;
+  event_type: CashDrawerEventType;
+  expected_amount: number;
+  actual_amount: number;
+  discrepancy: number | null;
+  created_at: Date;
+}
+
+export interface DailyDigest {
+  store_id: string;
+  date: string;
+  total_sales_amount: number;
+  number_of_transactions: number;
+  shifts: {
+    total: number;
+    clean: number;
+    discrepancy_locked: number;
+  };
+  total_discrepancy_amount: number;
+  anomalies: any[];
+}
+
+export interface PendingTransfer {
+  id: string;
+  store_id: string;
+  ticket_id: string | null;
+  sale_id: string | null;
+  amount: number;
+  currency: string;
+  status: PendingTransferStatus;
+  created_at: Date;
+  confirmed_at: Date | null;
 }
 
 export interface StaleStockAlert {

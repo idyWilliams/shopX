@@ -8,6 +8,8 @@ import { CashDrawerLog } from './models/CashDrawerLog'
 import { Lead } from './models/Lead'
 import { Product } from './models/Product'
 import { StoreAttendant } from './models/StoreAttendant'
+import { Shift } from './models/Shift'
+import { PendingTransfer } from './models/PendingTransfer'
 
 const adapter = new SQLiteAdapter({
   schema,
@@ -25,7 +27,9 @@ export const database = new Database({
     CashDrawerLog,
     Lead,
     Product,
-    StoreAttendant
+    StoreAttendant,
+    Shift,
+    PendingTransfer
   ],
 })
 
