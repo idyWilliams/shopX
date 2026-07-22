@@ -16,11 +16,12 @@ serve(async (req) => {
 
   try {
     console.log('[send-email-otp] Parsing request body');
-    const { email } = await req.json();
+    const body = await req.json() as { email?: string };
+    const normalizedEmail = body.email?.trim().toLowerCase() ?? '';
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
+    if (!normalizedEmail || !emailRegex.test(normalizedEmail)) {
       console.error('[send-email-otp] Invalid email format');
       return new Response(JSON.stringify({ error: 'Please enter a valid email address.' }), {
         status: 400,
@@ -46,17 +47,17 @@ serve(async (req) => {
     // Generate secure 6-digit OTP
     const rawOtp = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
     const otp = String(rawOtp).padStart(6, '0');
-    console.log(`[OTP] Generated email OTP for ${email}: ${otp}`);
+    console.log(`[OTP] Generated email OTP for ${normalizedEmail}: ${otp}`);
 
     // Delete existing unused OTPs for this email
-    await supabaseAdmin.from('otp_verifications').delete().eq('email', email).eq('used', false);
+    await supabaseAdmin.from('otp_verifications').delete().eq('email', normalizedEmail).eq('used', false);
 
     // Insert new OTP record
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     const { error: insertError } = await supabaseAdmin
       .from('otp_verifications')
       .insert({
-        email,
+        email: normalizedEmail,
         otp,
         channel: 'email',
         expires_at: expiresAt,
@@ -77,7 +78,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         from: 'ShopX <onboarding@resend.dev>',
-        to: [email],
+        to: [normalizedEmail],
         subject: 'Your ShopX verification code',
         html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;"><h2 style="color:#0EA5E9;margin-bottom:8px;">ShopX</h2><p style="color:#666;margin-bottom:32px;">Your verification code</p><div style="background:#f4f4f4;border-radius:12px;padding:32px;text-align:center;"><p style="font-size:48px;font-weight:bold;letter-spacing:12px;color:#111;margin:0;">${otp}</p></div><p style="color:#666;margin-top:24px;font-size:14px;">This code expires in 10 minutes. Do not share it with anyone.</p><p style="color:#999;font-size:12px;margin-top:32px;">If you didn't request this, ignore this email.</p></div>`,
       }),

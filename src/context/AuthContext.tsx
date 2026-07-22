@@ -4,7 +4,14 @@ import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Simplified types for disabled WatermelonDB
-type SimpleStore = { id: string; name: string; merchantId: string; locationAddress?: string };
+type SimpleStore = { 
+  id: string; 
+  name: string; 
+  merchantId: string; 
+  locationAddress?: string; 
+  category?: string;
+  location_address?: string; // for Supabase compatibility
+};
 type SimpleAttendant = { id: string; name: string };
 type SimpleMerchant = { id: string; name: string };
 
@@ -26,8 +33,7 @@ type AuthContextType = {
   setHasCompletedOnboarding: (completed: boolean) => Promise<void>;
   loadAllStoresForOwner: (merchantId: string) => Promise<void>;
   loadAuthorizedStoresForAttendant: (attendantId: string) => Promise<void>;
-  createDefaultStore: (merchantId: string, storeName?: string, category?: string) => Promise<SimpleStore>;
-  simulateLogin: (email: string) => void;
+  createDefaultStore: (merchantId: string, storeName?: string, category?: string, logo?: string) => Promise<SimpleStore>;
   signOut: () => Promise<void>;
 };
 
@@ -50,7 +56,6 @@ const AuthContext = createContext<AuthContextType>({
   loadAllStoresForOwner: async () => {},
   loadAuthorizedStoresForAttendant: async () => {},
   createDefaultStore: async () => { throw new Error('Not implemented'); },
-  simulateLogin: () => {},
   signOut: async () => {},
 });
 
@@ -105,15 +110,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const createDefaultStore = async (merchantId: string, storeName?: string, category?: string): Promise<SimpleStore> => {
+  const createDefaultStore = async (merchantId: string, storeName?: string, category?: string, _logo?: string): Promise<SimpleStore> => {
     // Create a merchant record if it doesn't exist
-    const { data: merchantData, error: merchantError } = await supabase
+    const { error: merchantError } = await supabase
       .from('merchants')
       .upsert({ id: merchantId, email: user?.email || '' })
       .select()
       .single();
 
-    if (merchantError && merchantError.code !== '23505') {
+    if (merchantError && merchantError.code !== '23505' && merchantError.code !== 'PGRST205') {
       console.error('Error creating merchant:', merchantError);
     }
 
@@ -124,9 +129,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       .single();
 
     if (error) {
-      console.error('Error creating default store:', error);
-      // Fallback for when Supabase is unreachable/missing schema
-      return { id: 'local-store', name: storeName || 'My Local Store', merchantId, category: category || 'Retail' } as any;
+      if (error.code !== 'PGRST205') {
+        console.error('Error creating default store:', error);
+      }
+      return {
+        id: `local-store-${merchantId}`,
+        name: storeName || 'Default Shop',
+        merchantId,
+        category: category || 'Retail',
+      };
     }
 
     return {
@@ -134,6 +145,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       name: data.name,
       merchantId: data.merchant_id,
       category: data.category,
+      locationAddress: data.location_address,
+      location_address: data.location_address,
     };
   };
 
@@ -152,6 +165,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         id: s.id,
         name: s.name,
         merchantId: s.merchant_id || s.merchantId,
+        category: s.category,
+        locationAddress: s.location_address || s.locationAddress,
+        location_address: s.location_address || s.locationAddress,
       }));
 
       setAuthorizedStores(formattedStores);
@@ -159,13 +175,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setActiveStoreId(formattedStores[0].id);
       }
     } catch (err) {
-      console.error('Failed to load stores for owner:', err);
-      // Fallback to dummy stores if Supabase fails
-      const dummyStores = [
-        { id: 'dummy-store-1', name: 'My Shop', merchantId: merchantId },
-      ];
-      setAuthorizedStores(dummyStores);
-      setActiveStoreId(dummyStores[0].id);
+      const errorCode = (err as { code?: string } | null)?.code;
+      if (errorCode !== 'PGRST205') {
+        console.error('Failed to load stores for owner:', err);
+      }
+      const fallbackStore: SimpleStore = {
+        id: `local-store-${merchantId}`,
+        name: 'Default Shop',
+        merchantId,
+      };
+      setAuthorizedStores([fallbackStore]);
+      setActiveStoreId(fallbackStore.id);
     } finally {
       setHasLoadedStores(true);
     }
@@ -205,25 +225,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const simulateLogin = (email: string) => {
-    const mockSession = {
-      access_token: 'mock-token',
-      refresh_token: 'mock-refresh',
-      expires_in: 3600,
-      token_type: 'bearer',
-      user: {
-        id: 'mock-user-id-1234',
-        email: email,
-        app_metadata: {},
-        user_metadata: {},
-        aud: 'authenticated',
-        created_at: new Date().toISOString()
-      }
-    };
-    setSession(mockSession as any);
-    setUser(mockSession.user as any);
-  };
-
   const signOut = async () => {
     await supabase.auth.signOut();
     setActiveStoreId(null);
@@ -253,7 +254,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       loadAllStoresForOwner,
       loadAuthorizedStoresForAttendant,
       createDefaultStore,
-      simulateLogin,
       signOut 
     }}>
       {children}

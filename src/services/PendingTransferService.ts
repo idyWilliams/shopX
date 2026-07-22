@@ -1,4 +1,5 @@
-import { database } from '../db';
+import { Q } from '@nozbe/watermelondb';
+import { getDatabase } from '../db';
 import { PendingTransfer } from '../db/models/PendingTransfer';
 import { syncData } from '../lib/sync';
 
@@ -12,6 +13,7 @@ export const createPendingTransfer = async (
   amount: number,
   currency: string = 'NGN'
 ): Promise<PendingTransfer> => {
+  const database = getDatabase();
   return await database.write(async () => {
     const transfer = await database.get<PendingTransfer>('pending_transfers').create(t => {
       t.storeId = storeId;
@@ -37,6 +39,7 @@ export const createPendingTransfer = async (
  * Marks a pending transfer as confirmed
  */
 export const confirmTransfer = async (transferId: string): Promise<PendingTransfer> => {
+  const database = getDatabase();
   return await database.write(async () => {
     const transfer = await database.get<PendingTransfer>('pending_transfers').find(transferId);
     const updatedTransfer = await transfer.update(t => {
@@ -59,6 +62,7 @@ export const confirmTransfer = async (transferId: string): Promise<PendingTransf
  * Marks a pending transfer as failed
  */
 export const failTransfer = async (transferId: string): Promise<PendingTransfer> => {
+  const database = getDatabase();
   return await database.write(async () => {
     const transfer = await database.get<PendingTransfer>('pending_transfers').find(transferId);
     const updatedTransfer = await transfer.update(t => {
@@ -80,8 +84,8 @@ export const failTransfer = async (transferId: string): Promise<PendingTransfer>
  * Gets all pending (initiated) transfers for a store
  */
 export const getPendingTransfers = async (storeId: string): Promise<PendingTransfer[]> => {
+  const database = getDatabase();
   return await database.get<PendingTransfer>('pending_transfers')
-    .query()
-    .filter(t => t.storeId === storeId && t.status === 'initiated')
+    .query(Q.where('store_id', storeId), Q.where('status', 'initiated'))
     .fetch();
 };

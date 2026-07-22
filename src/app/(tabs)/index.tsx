@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Dimensions, Pressable, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Q } from '@nozbe/watermelondb';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, FadeInDown, FadeInUp, FadeOutDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../context/AuthContext';
 import { useShift } from '../../context/ShiftContext';
 import { syncData } from '../../lib/sync';
-import { database } from '../../db';
+import { getDatabase } from '../../db';
 import { Product } from '../../db/models/Product';
 import { SalesEvent } from '../../db/models/SalesEvent';
 import { createPendingTransfer } from '../../services/PendingTransferService';
@@ -30,31 +31,10 @@ export default function RegisterScreen() {
   
   useEffect(() => {
     const loadProducts = async () => {
-      await database.write(async () => {
-        const existing = await database.get<Product>('products').query().fetch();
-        if (existing.length === 0 && activeStoreId) {
-          await database.get<Product>('products').create(p => {
-            p.orgId = activeStoreId;
-            p.name = 'Sample Item A';
-            p.baseCurrency = 'NGN';
-            p.costPrice = 1000;
-            p.sellingPrice = 1500;
-            p.stockQuantity = 50;
-            p.imageUrl = null;
-          });
-          await database.get<Product>('products').create(p => {
-            p.orgId = activeStoreId;
-            p.name = 'Sample Item B';
-            p.baseCurrency = 'NGN';
-            p.costPrice = 2000;
-            p.sellingPrice = 3000;
-            p.stockQuantity = 30;
-            p.imageUrl = null;
-          });
-        }
-      });
-      
-      const allProducts = await database.get<Product>('products').query().fetch();
+      const database = getDatabase();
+      const allProducts = activeStoreId
+        ? await database.get<Product>('products').query(Q.where('org_id', activeStoreId)).fetch()
+        : [];
       setProducts(allProducts);
     };
     
@@ -100,25 +80,28 @@ export default function RegisterScreen() {
     isSheetOpen.value = false;
     
     if (!activeStoreId) return;
-    const ticketId = Math.random().toString(36).substr(2, 9).toUpperCase();
+    const database = getDatabase();
+    const ticketId = Math.random().toString(36).slice(2, 11).toUpperCase();
     const saleTotal = cartTotalAmount;
 
     try {
       await database.write(async () => {
         // Create sales events for each item
         for (const item of cart) {
-          await database.get<SalesEvent>('sales_events').create(event => {
+          await database.get<SalesEvent>('sales_events').create((event: SalesEvent) => {
             event.storeId = activeStoreId;
             event.ticketId = ticketId;
             event.productId = item.product.id;
             event.quantity = item.quantity;
             event.priceAtSale = item.product.sellingPrice;
-            event.eventType = 'sale';
-            event.shiftId = activeShift?.id; // Associate with active shift
+            event.eventType = 'SALE';
+            event.attendantId = activeShift?.attendantId ?? undefined;
+            event.shiftId = activeShift?.id;
+            event.paymentMethod = method;
           });
           
           const productToUpdate = await database.get<Product>('products').find(item.product.id);
-          await productToUpdate.update(p => {
+          await productToUpdate.update((p: Product) => {
             p.stockQuantity -= item.quantity;
           });
         }
@@ -135,10 +118,10 @@ export default function RegisterScreen() {
         );
       }
       
-      const allProducts = await database.get<Product>('products').query().fetch();
+      const allProducts = await database.get<Product>('products').query(Q.where('org_id', activeStoreId)).fetch();
       setProducts(allProducts);
       setCart([]);
-      syncData();
+      await syncData();
 
       cart.forEach(item => {
         const remaining = item.product.stockQuantity - item.quantity;

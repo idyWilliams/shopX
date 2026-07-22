@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   console.log('[verify-email-otp] Function invoked');
   if (req.method === 'OPTIONS') {
     console.log('[verify-email-otp] Handling OPTIONS request');
@@ -16,7 +16,9 @@ serve(async (req) => {
 
   try {
     console.log('[verify-email-otp] Parsing request body');
-    const { email, otp } = await req.json();
+    const body = await req.json() as { email?: string; otp?: string };
+    const email = body.email?.trim().toLowerCase() ?? '';
+    const otp = body.otp?.trim() ?? '';
 
     if (!email || !otp) {
       console.error('[verify-email-otp] Missing required fields');
@@ -35,6 +37,7 @@ serve(async (req) => {
       .from('otp_verifications')
       .select('*')
       .eq('email', email)
+      .eq('channel', 'email')
       .eq('used', false)
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
@@ -56,7 +59,7 @@ serve(async (req) => {
     const record = records[0];
     console.log('[verify-email-otp] Found OTP record:', record);
 
-    if (record.otp !== otp) {
+    if (String(record.otp).trim() !== otp) {
       console.error('[verify-email-otp] OTP mismatch');
       return new Response(JSON.stringify({ error: 'Incorrect code. Please try again.' }), {
         status: 400,

@@ -39,6 +39,16 @@ export default function ShopXLens() {
   const pulseOpacity = useSharedValue(1);
   const bottomSheetY = useSharedValue(SCREEN_HEIGHT);
 
+  // All animated styles (hooks) must be defined BEFORE any early returns!
+  const animatedPulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseScale.value }],
+    opacity: pulseOpacity.value,
+  }));
+
+  const animatedBottomSheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: bottomSheetY.value }],
+  }));
+
   useEffect(() => {
     pulseScale.value = withRepeat(
       withSequence(
@@ -98,15 +108,6 @@ export default function ShopXLens() {
       </View>
     );
   }
-
-  const animatedPulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseScale.value }],
-    opacity: pulseOpacity.value,
-  }));
-
-  const animatedBottomSheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: bottomSheetY.value }],
-  }));
 
   return (
     <View style={styles.container}>

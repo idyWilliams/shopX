@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 const Onboarding = () => {
-  const { setActiveStoreId, setAuthorizedStores, setSoloOwner, createDefaultStore, setHasCompletedOnboarding } = useAuth();
+  const { user, setActiveStoreId, setAuthorizedStores, setSoloOwner, createDefaultStore, setHasCompletedOnboarding } = useAuth();
 
   const [storeName, setStoreName] = useState('');
   const [storeLogo, setStoreLogo] = useState<string | null>(null);
@@ -15,7 +15,6 @@ const Onboarding = () => {
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
   const [merchantEmail, setMerchantEmail] = useState('');
   const [merchantPhone, setMerchantPhone] = useState('');
-  const [isSoloOwner, setIsSoloOwner] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
@@ -26,7 +25,7 @@ const Onboarding = () => {
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.5,
@@ -38,6 +37,10 @@ const Onboarding = () => {
   };
 
   const completeStep1 = async () => {
+    if (!user?.id) {
+      Alert.alert('Error', 'You must be signed in before completing setup.');
+      return;
+    }
     if (!merchantEmail) {
       Alert.alert('Error', 'Please enter your admin email');
       return;
@@ -50,7 +53,7 @@ const Onboarding = () => {
     setIsSubmitting(true);
     try {
       const categoriesString = selectedCategories.join(', ');
-      const defaultStore = await createDefaultStore('temp-merchant-id', storeName, categoriesString, storeLogo || undefined);
+      const defaultStore = await createDefaultStore(user.id, storeName, categoriesString, storeLogo || undefined);
 
       setSoloOwner(true);
       setActiveStoreId(defaultStore.id);

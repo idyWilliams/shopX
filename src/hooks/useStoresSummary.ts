@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
-import { database } from '../db';
+import { getDatabase } from '../db';
 import { useAuth } from '../context/AuthContext';
+import { SalesEvent } from '../db/models/SalesEvent';
+import { Shift } from '../db/models/Shift';
+import { OperationalAnomaly } from '../db/models/OperationalAnomaly';
 
 export interface StoreSummary {
   store_id: string;
@@ -14,7 +17,7 @@ export interface StoreSummary {
 }
 
 export function useStoresSummary() {
-  const { authorizedStores, activeStoreId } = useAuth();
+  const { authorizedStores } = useAuth();
   const [summaries, setSummaries] = useState<StoreSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,6 +25,7 @@ export function useStoresSummary() {
     const fetchSummaries = async () => {
       try {
         setLoading(true);
+        const database = getDatabase();
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -29,49 +33,55 @@ export function useStoresSummary() {
         tomorrow.setDate(tomorrow.getDate() + 1);
 
         // Fetch all sales events today
-        const salesEvents = await database.get('sales_events').query().fetch();
+        const salesEvents = await database.get<SalesEvent>('sales_events').query().fetch();
         const todaysSales = salesEvents.filter(
-          (e: any) => new Date(e.createdAt) >= today && new Date(e.createdAt) < tomorrow
+          (e) => new Date(e.createdAt) >= today && new Date(e.createdAt) < tomorrow
         );
 
         // Fetch all shifts today
-        const shifts = await database.get('shifts').query().fetch();
+        const shifts = await database.get<Shift>('shifts').query().fetch();
         const todaysShifts = shifts.filter(
-          (s: any) => new Date(s.openedAt) >= today && new Date(s.openedAt) < tomorrow
+          (s) => new Date(s.openedAt) >= today && new Date(s.openedAt) < tomorrow
         );
 
         // Fetch all anomalies
-        const anomalies = await database.get('operational_anomalies').query().fetch();
+        const anomalies = await database.get<OperationalAnomaly>('operational_anomalies').query().fetch();
 
         // Create summaries for each store
         const storeSummaries: StoreSummary[] = authorizedStores.map(store => {
-          const storeSales = todaysSales.filter((s: any) => s.storeId === store.id);
+          const storeSales = todaysSales.filter((s) => s.storeId === store.id);
           const revenueToday = storeSales.reduce(
-            (sum: number, s: any) => sum + (s.priceAtSale * s.quantity),
+            (sum: number, s) => sum + (s.priceAtSale * s.quantity),
             0
           );
 
           const activeShift = todaysShifts.find(
-            (s: any) => s.storeId === store.id && s.status === 'open'
+            (s) => s.storeId === store.id && s.status === 'open'
           );
 
           const storeAnomalies = anomalies.filter(
-            (a: any) => a.storeId === store.id && !a.resolved
+            (a) => a.storeId === store.id && !a.resolved
           );
 
           const lastActivity = [...storeSales, ...todaysShifts].sort(
-            (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            (a, b) => {
+              const aDate = 'createdAt' in a ? a.createdAt : a.openedAt;
+              const bDate = 'createdAt' in b ? b.createdAt : b.openedAt;
+              return new Date(bDate).getTime() - new Date(aDate).getTime();
+            }
           )[0];
 
           return {
             store_id: store.id,
             name: store.name,
-            location: store.location_address,
+            location: store.locationAddress || store.location_address,
             revenue_today: revenueToday,
             active_shift: activeShift,
             active_attendant_name: activeShift?.attendantId ? 'Attendant' : undefined,
             anomaly_count: storeAnomalies.length,
-            last_activity_at: lastActivity ? new Date(lastActivity.createdAt) : new Date()
+            last_activity_at: lastActivity
+              ? new Date('createdAt' in lastActivity ? lastActivity.createdAt : lastActivity.openedAt)
+              : new Date()
           };
         });
 

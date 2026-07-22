@@ -1,4 +1,5 @@
-import { database } from '../db';
+import { getDatabase } from '../db';
+import { Q } from '@nozbe/watermelondb';
 import { Shift } from '../db/models/Shift';
 import { CashDrawerLog } from '../db/models/CashDrawerLog';
 import { syncData } from '../lib/sync';
@@ -13,6 +14,7 @@ export const openShift = async (
   openingCashFloat: number
 ): Promise<Shift> => {
   const now = new Date();
+  const database = getDatabase();
 
   return await database.write(async () => {
     // Create shift record
@@ -60,6 +62,7 @@ export const closeShift = async (
   const totalExpected = expectedCash + expectedTransfers;
   const totalDeclared = declaredCash + declaredTransfers;
   const discrepancy = totalDeclared - totalExpected;
+  const database = getDatabase();
 
   return await database.write(async () => {
     // Get the shift to update
@@ -108,9 +111,11 @@ export const closeShift = async (
  * Gets the currently active (open) shift for a store
  */
 export const getActiveShift = async (storeId: string): Promise<Shift | null> => {
+  const database = getDatabase();
+  
   const shifts = await database.get<Shift>('shifts')
-    .query()
-    .filter(shift => shift.storeId === storeId && shift.status === 'open')
+    .query(Q.where('store_id', storeId), Q.where('status', 'open'))
     .fetch();
+  
   return shifts.length > 0 ? shifts[0] : null;
 };

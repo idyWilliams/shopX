@@ -1,9 +1,10 @@
 import { synchronize } from '@nozbe/watermelondb/sync';
-import { database } from '../db';
+import { getDatabase } from '../db';
 import { supabase } from './supabase';
 
 export async function syncData() {
   try {
+    const database = getDatabase();
     await synchronize({
       database,
       pullChanges: async ({ lastPulledAt, schemaVersion, migration }) => {
@@ -41,7 +42,6 @@ export async function syncData() {
           console.warn('Network error during pushChanges:', e.message);
         }
       },
-      migrationsEnabledAtVersion: 1,
     });
     console.log('Synchronization completed successfully');
   } catch (error) {

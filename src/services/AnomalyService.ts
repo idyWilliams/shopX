@@ -1,4 +1,4 @@
-import { database } from '../db';
+import { getDatabase } from '../db';
 
 interface CashGapPayload {
   expectedAmount: number;
@@ -18,6 +18,7 @@ export class AnomalyService {
       return;
     }
 
+    const database = getDatabase();
     await database.write(async () => {
       await database.get('operational_anomalies').create((anomaly: any) => {
         anomaly.storeId = storeId;
@@ -37,6 +38,7 @@ export class AnomalyService {
     attendantId: string | null,
     voidCount: number
   ) {
+    const database = getDatabase();
     await database.write(async () => {
       await database.get('operational_anomalies').create((anomaly: any) => {
         anomaly.storeId = storeId;
@@ -55,6 +57,7 @@ export class AnomalyService {
     attendantId: string,
     deviceFingerprint: string
   ) {
+    const database = getDatabase();
     await database.write(async () => {
       await database.get('operational_anomalies').create((anomaly: any) => {
         anomaly.storeId = storeId;
@@ -68,6 +71,7 @@ export class AnomalyService {
   }
 
   static async markAnomalyResolved(anomalyId: string) {
+    const database = getDatabase();
     await database.write(async () => {
       const anomaly = await database.get('operational_anomalies').find(anomalyId);
       await anomaly.update((a: any) => {

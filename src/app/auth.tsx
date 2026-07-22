@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, NativeSyntheticEvent, TextInputKeyPressEventData } from 'react-native';
 import CountryPicker, { CountryCode, Country } from 'react-native-country-picker-modal';
 import { supabase } from '../lib/supabase';
 
@@ -38,14 +38,15 @@ export default function AuthScreen() {
 
     try {
       if (mode === 'email') {
-        if (!email.includes('@')) throw new Error('Please enter a valid email address.');
+        const normalizedEmail = email.trim().toLowerCase();
+        if (!normalizedEmail.includes('@')) throw new Error('Please enter a valid email address.');
         const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/send-email-otp`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ email: normalizedEmail }),
         });
         if (!response.ok) {
           try {
@@ -56,11 +57,13 @@ export default function AuthScreen() {
           }
           throw new Error('Service temporarily unavailable. Please check your admin configuration.');
         }
-        console.log(`[OTP] Email OTP sent to: ${email}`);
-        setSuccessMessage(`We sent a code to ${email}`);
+        console.log(`[OTP] Email OTP sent to: ${normalizedEmail}`);
+        setSuccessMessage(`We sent a code to ${normalizedEmail}`);
+        setEmail(normalizedEmail);
       } else {
-        if (phone.length < 7) throw new Error('Please enter a valid phone number.');
-        const fullPhone = `+${callingCode}${phone}`;
+        const sanitizedPhone = phone.replace(/\D/g, '');
+        if (sanitizedPhone.length < 7) throw new Error('Please enter a valid phone number.');
+        const fullPhone = `+${callingCode}${sanitizedPhone}`;
         const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/send-whatsapp-otp`, {
           method: 'POST',
           headers: {
@@ -72,19 +75,20 @@ export default function AuthScreen() {
         if (!response.ok) {
           try {
             const data = await response.json();
-            console.error('[send-whatsapp-otp] Error:', data);
+            console.warn('[send-whatsapp-otp] Request failed:', data);
           } catch (parseErr) {
-            console.error('[send-whatsapp-otp] Failed to parse error:', parseErr);
+            console.warn('[send-whatsapp-otp] Failed to parse error:', parseErr);
           }
           throw new Error('Service temporarily unavailable. Please check your admin configuration.');
         }
         console.log(`[OTP] WhatsApp OTP sent to: ${fullPhone}`);
-        setSuccessMessage(`We sent a code to +${callingCode}${phone}`);
+        setSuccessMessage(`We sent a code to ${fullPhone}`);
+        setPhone(sanitizedPhone);
       }
       setStep('verify');
       setResendTimer(60);
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }
@@ -95,25 +99,28 @@ export default function AuthScreen() {
     setLoading(true);
 
     try {
+      const sanitizedOtp = enteredOtp.replace(/\D/g, '');
+
       if (mode === 'email') {
+        const normalizedEmail = email.trim().toLowerCase();
         const verifyRes = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/verify-email-otp`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ email, otp: enteredOtp }),
+          body: JSON.stringify({ email: normalizedEmail, otp: sanitizedOtp }),
         });
         if (!verifyRes.ok) {
           let errorMsg = 'Invalid OTP';
           try {
             const verifyData = await verifyRes.json();
-            console.error('[verify-email-otp] Error:', verifyData);
+            console.warn('[verify-email-otp] Request failed:', verifyData);
             if (verifyData.error) {
               errorMsg = verifyData.error;
             }
           } catch (parseErr) {
-            console.error('[verify-email-otp] Failed to parse error:', parseErr);
+            console.warn('[verify-email-otp] Failed to parse error:', parseErr);
           }
           throw new Error(errorMsg);
         }
@@ -124,25 +131,25 @@ export default function AuthScreen() {
         });
         if (authError) throw authError;
       } else {
-        const fullPhone = `+${callingCode}${phone}`;
+        const fullPhone = `+${callingCode}${phone.replace(/\D/g, '')}`;
         const verifyRes = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/verify-whatsapp-otp`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ phone: fullPhone, otp: enteredOtp }),
+          body: JSON.stringify({ phone: fullPhone, otp: sanitizedOtp }),
         });
         if (!verifyRes.ok) {
           let errorMsg = 'Invalid OTP';
           try {
             const verifyData = await verifyRes.json();
-            console.error('[verify-whatsapp-otp] Error:', verifyData);
+            console.warn('[verify-whatsapp-otp] Request failed:', verifyData);
             if (verifyData.error) {
               errorMsg = verifyData.error;
             }
           } catch (parseErr) {
-            console.error('[verify-whatsapp-otp] Failed to parse error:', parseErr);
+            console.warn('[verify-whatsapp-otp] Failed to parse error:', parseErr);
           }
           throw new Error(errorMsg);
         }
@@ -153,8 +160,8 @@ export default function AuthScreen() {
         });
         if (authError) throw authError;
       }
-    } catch (err: any) {
-      setError(err.message || 'Verification failed.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verification failed.');
       setOtp(['', '', '', '', '', '']);
       otpRefs.current[0]?.focus();
     } finally {
@@ -175,7 +182,7 @@ export default function AuthScreen() {
     }
   };
 
-  const handleOtpKeyPress = (e: any, index: number) => {
+  const handleOtpKeyPress = (e: NativeSyntheticEvent<TextInputKeyPressEventData>, index: number) => {
     if (e.nativeEvent.key === 'Backspace' && otp[index] === '' && index > 0) {
       otpRefs.current[index - 1]?.focus();
     }
