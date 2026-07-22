@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, ScrollView } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '../../../context/AuthContext';
 import { useDailyDigest } from '../../../hooks/useDailyDigest';
+import { useStoresSummary } from '../../../hooks/useStoresSummary';
+import { useGlobalOverview } from '../../../hooks/useGlobalOverview';
 
 const formatCurrency = (amount: number): string => {
   if (isNaN(amount)) {
@@ -27,6 +29,7 @@ const GRID_ITEMS: GridItem[] = [
   { id: 'lens', title: 'ShopX Lens', icon: 'camera', color: '#0EA5E9', screen: '/lens' },
   { id: 'alerts', title: 'Alerts & Notifications', icon: 'bell', color: '#EF4444', screen: '/settings/alerts', badge: 3 },
   { id: 'transfers', title: 'Pending Transfers', icon: 'dollar-sign', color: '#10B981', screen: '/store/pending-transfers' },
+  { id: 'anomalies', title: 'Anomaly Feed', icon: 'alert-triangle', color: '#F59E0B', screen: '/store/anomalies' },
   { id: 'leads', title: 'Leads Tracker', icon: 'users', color: '#8B5CF6', screen: '/store/leads' },
   { id: 'staff', title: 'Staff & Attendants', icon: 'user-check', color: '#10B981', screen: '/settings/team' },
   { id: 'settings', title: 'Business Settings', icon: 'settings', color: '#6B7280', screen: '/settings' },
@@ -102,6 +105,8 @@ export default function StoreScreen() {
   const router = useRouter();
   const { activeStoreId, authorizedStores } = useAuth();
   const { digest, isLoading: digestLoading } = useDailyDigest();
+  const { summaries: storeSummaries, loading: summariesLoading } = useStoresSummary();
+  const { overview, loading: overviewLoading } = useGlobalOverview();
   const activeStore = authorizedStores.find(s => s.id === activeStoreId);
   const storeName = activeStore?.name || 'My Business';
 
@@ -121,6 +126,55 @@ export default function StoreScreen() {
         </View>
 
         <Animated.ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* --- Overview Cards Section */}
+          <Text style={styles.insightsTitle}>Today At a Glance</Text>
+          {overviewLoading ? (
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <ActivityIndicator size="large" color="#0EA5E9" />
+            </View>
+          ) : (
+            <View style={styles.overviewCardsRow}>
+              <OverviewCard
+                title="Total Revenue"
+                value={formatCurrency(overview.total_revenue_today)}
+                color="#10b981"
+              />
+              <OverviewCard
+                title="Active Shifts"
+                value={overview.active_shifts_count}
+                color="#0EA5E9"
+              />
+              <OverviewCard
+                title="Anomalies"
+                value={overview.unresolved_anomalies_count}
+                color="#EF4444"
+              />
+              <OverviewCard
+                title="Locked Shifts"
+                value={overview.locked_shifts_count}
+                color="#F59E0B"
+              />
+            </View>
+          )}
+
+          {/* --- Store List Section */}
+          <View style={styles.storeListSection}>
+            <Text style={styles.storeListTitle}>Your Stores</Text>
+            {summariesLoading ? (
+              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+                <ActivityIndicator size="large" color="#0EA5E9" />
+              </View>
+            ) : (
+              storeSummaries.map(summary => (
+                <StoreCard
+                  key={summary.store_id}
+                  summary={summary}
+                  onPress={() => router.push(`/store/detail/${summary.store_id}`)}
+                />
+              ))
+            )}
+          </View>
+
           {/* --- Daily Digest Section */}
           <Text style={styles.insightsTitle}>Daily Digest</Text>
           <WidgetCard title="Today's Summary" wide>
@@ -273,6 +327,34 @@ export default function StoreScreen() {
   );
 }
 
+const OverviewCard = ({ title, value, color }: { title: string; value: string | number; color: string }) => {
+  return (
+    <View style={[styles.overviewCard, { borderLeftColor: color, borderLeftWidth: 4 }]}>
+      <Text style={styles.overviewTitle}>{title}</Text>
+      <Text style={[styles.overviewValue, { color }]}>{value}</Text>
+    </View>
+  );
+};
+
+const StoreCard = ({ summary, onPress }: { summary: any; onPress: () => void }) => {
+  return (
+    <TouchableOpacity style={styles.storeCard} onPress={onPress}>
+      <View style={styles.storeCardTop}>
+        <Text style={styles.storeName}>{summary.name}</Text>
+        {summary.anomaly_count > 0 && (
+          <View style={styles.storeAnomalyBadge}>
+            <Text style={styles.storeAnomalyBadgeText}>{summary.anomaly_count}</Text>
+          </View>
+        )}
+      </View>
+      <Text style={styles.storeRevenueToday}>Today: {formatCurrency(summary.revenue_today)}</Text>
+      <Text style={styles.storeLastActivity}>
+        Last Activity: {summary.last_activity_at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      </Text>
+    </TouchableOpacity>
+  );
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -288,6 +370,81 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
+  },
+  // Overview cards styles
+  overviewCardsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 24,
+  },
+  overviewCard: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    padding: 16,
+    width: '48%',
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  overviewTitle: {
+    color: '#a1a1aa',
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  overviewValue: {
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  // Store card styles
+  storeListSection: {
+    marginTop: 24,
+  },
+  storeListTitle: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  storeCard: {
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  storeCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  storeName: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  storeAnomalyBadge: {
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  storeAnomalyBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  storeRevenueToday: {
+    color: '#10b981',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  storeLastActivity: {
+    color: '#71717a',
+    fontSize: 12,
+    marginTop: 4,
   },
   headerTitle: {
     fontSize: 28,

@@ -165,3 +165,33 @@ export interface LeadSignal {
   match_confidence: number;
   is_locked?: boolean;
 }
+
+export interface OperationalAnomaly {
+  id: string;
+  store_id: string;
+  shift_id?: string;
+  attendant_id?: string;
+  anomaly_type: string;
+  severity: "low" | "medium" | "high" | "critical";
+  payload?: string;
+  resolved: boolean;
+  created_at: Date;
+}
+
+export interface StoreSummary {
+  store_id: string;
+  name: string;
+  location?: string;
+  revenue_today: number;
+  active_shift?: Shift;
+  active_attendant_name?: string;
+  anomaly_count: number;
+  last_activity_at: Date;
+}
+
+export interface GlobalOverview {
+  total_revenue_today: number;
+  active_shifts_count: number;
+  unresolved_anomalies_count: number;
+  locked_shifts_count: number;
+}

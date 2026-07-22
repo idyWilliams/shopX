@@ -12,6 +12,7 @@ export class SalesEvent extends Model {
   @field('event_type') eventType!: string
   @field('attendant_id') attendantId?: string
   @field('shift_id') shiftId?: string // Added shift_id
+  @field('payment_method') paymentMethod?: string // Added payment method
   
   @readonly @date('created_at') createdAt!: Date
 }

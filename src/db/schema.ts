@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb'
 
 export const schema = appSchema({
-  version: 2, // Incremented schema version
+  version: 3, // Incremented schema version again
   tables: [
     tableSchema({
       name: 'sales_events',
@@ -14,6 +14,7 @@ export const schema = appSchema({
         { name: 'event_type', type: 'string' },
         { name: 'attendant_id', type: 'string', isOptional: true },
         { name: 'shift_id', type: 'string', isOptional: true }, // Added shift_id
+        { name: 'payment_method', type: 'string', isOptional: true }, // Added payment method
         { name: 'created_at', type: 'number' },
       ]
     }),
@@ -46,9 +47,12 @@ export const schema = appSchema({
       name: 'operational_anomalies',
       columns: [
         { name: 'store_id', type: 'string' },
+        { name: 'shift_id', type: 'string', isOptional: true },
+        { name: 'attendant_id', type: 'string', isOptional: true },
         { name: 'anomaly_type', type: 'string' },
         { name: 'severity', type: 'string' },
         { name: 'payload', type: 'string', isOptional: true },
+        { name: 'resolved', type: 'boolean' },
         { name: 'created_at', type: 'number' },
       ]
     }),

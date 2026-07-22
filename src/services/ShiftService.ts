@@ -2,6 +2,7 @@ import { database } from '../db';
 import { Shift } from '../db/models/Shift';
 import { CashDrawerLog } from '../db/models/CashDrawerLog';
 import { syncData } from '../lib/sync';
+import { AnomalyService } from './AnomalyService';
 
 /**
  * Opens a new shift
@@ -79,6 +80,18 @@ export const closeShift = async (
       log.actualAmount = totalDeclared;
       log.discrepancy = discrepancy;
     });
+
+    // Log cash gap anomaly if needed
+    await AnomalyService.logCashGapAnomaly(
+      storeId,
+      shiftId,
+      updatedShift.attendantId,
+      {
+        expectedAmount: totalExpected,
+        declaredAmount: totalDeclared,
+        discrepancy
+      }
+    );
 
     // Try to sync
     try {
